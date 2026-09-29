@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Monstritos · Cuestionario</title>
+<link rel="icon" href="icono.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="puntuacion.js"></script>
+<style>
+  :root { --verde: #71CB47; --azul: #4FAFEA; --rosa: #DB5183; --tinta: #141718; --tinta-2: #4A5053; --bg: #F5F8F3; --borde: #DDE6D8; --c: var(--verde); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body { font-family: "Nunito", system-ui, sans-serif; background: var(--bg); color: var(--tinta); font-size: 18px; line-height: 1.4; }
+  h1, h2, button, .fredoka { font-family: "Fredoka", "Nunito", sans-serif; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 16px 16px 40px; min-height: 100vh; display: flex; flex-direction: column; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 0 12px; }
+  .top img { height: 44px; }
+  .top .grp { font-size: 13px; color: var(--tinta-2); text-align: right; line-height: 1.2; }
+  .progreso { height: 12px; background: #fff; border-radius: 10px; overflow: hidden; border: 2px solid var(--borde); }
+  .progreso span { display: block; height: 100%; background: linear-gradient(90deg, var(--verde), var(--azul), var(--rosa)); transition: width .25s; }
+  .contador { font-size: 14px; color: var(--tinta-2); margin: 6px 2px 14px; font-weight: 700; }
+  .card { background: #fff; border-radius: 24px; padding: 24px 20px; border: 2px solid var(--borde); position: relative; }
+  .card.q { border-top: 10px solid var(--c); }
+  h1 { font-size: 28px; margin: 0 0 8px; line-height: 1.15; }
+  h2 { font-size: 24px; margin: 0 0 18px; line-height: 1.25; font-weight: 600; }
+  p { margin: 0 0 12px; }
+  .nota { background: #E5F3FC; color: #1C6FA8; border-radius: 14px; padding: 10px 14px; font-size: 16px; font-weight: 700; margin-bottom: 14px; }
+  label.l { display: block; font-weight: 800; margin: 14px 0 6px; font-size: 17px; }
+  input[type=text], input[type=number] { width: 100%; font-size: 22px; padding: 12px 14px; border: 2.5px solid var(--borde); border-radius: 16px; font-family: inherit; }
+  input:focus { outline: none; border-color: var(--azul); }
+  .ops { display: flex; flex-direction: column; gap: 10px; }
+  .op { width: 100%; text-align: left; background: #fff; border: 2.5px solid var(--borde); border-radius: 18px; padding: 15px 16px; font-size: 19px; font-weight: 600; color: var(--tinta); display: flex; align-items: center; gap: 12px; cursor: pointer; font-family: "Nunito", sans-serif; }
+  .op .ico { flex: 0 0 30px; height: 30px; border-radius: 10px; border: 2.5px solid var(--borde); display: flex; align-items: center; justify-content: center; font-family: "Fredoka"; font-size: 16px; color: var(--tinta-2); }
+  .op.sel { border-color: var(--tinta); background: #F7FBF4; }
+  .op.sel .ico { background: var(--c); border-color: var(--c); color: #fff; }
+  .skip { background: none; border: none; color: var(--tinta-2); font-size: 15px; text-decoration: underline; margin-top: 14px; cursor: pointer; padding: 6px; font-family: "Nunito"; }
+  .skip.sel { color: var(--tinta); font-weight: 800; }
+  .nav { display: flex; gap: 10px; margin-top: 18px; }
+  .btn { flex: 1; border: none; border-radius: 18px; padding: 16px; font-size: 20px; font-weight: 600; cursor: pointer; }
+  .btn.pri { background: var(--tinta); color: #fff; }
+  .btn.sec { background: #fff; color: var(--tinta); border: 2.5px solid var(--borde); flex: 0 0 auto; padding: 16px 20px; }
+  .btn:disabled { opacity: .4; cursor: default; }
+  .sexo { display: flex; gap: 10px; }
+  .sexo .op { justify-content: center; }
+  .error { background: #FBE7EF; color: #A8315D; border-radius: 14px; padding: 12px 14px; font-weight: 700; margin-top: 14px; font-size: 16px; }
+  .monstruos { display: flex; justify-content: center; gap: 12px; margin: 6px 0 18px; }
+  .m { width: 64px; height: 64px; border-radius: 16px; position: relative; }
+  .m::before, .m::after { content: ""; position: absolute; top: 20px; width: 18px; height: 18px; background: #fff; border-radius: 50%; box-shadow: inset 0 0 0 5px #fff, inset 5px 3px 0 5px var(--tinta); }
+  .m::before { left: 12px; } .m::after { right: 12px; }
+  .m.v { background: var(--verde); transform: rotate(-6deg); } .m.a { background: var(--azul); transform: translateY(8px); } .m.r { background: var(--rosa); transform: rotate(8deg); }
+  .extra input { margin-top: 6px; font-size: 18px; }
+  .center { text-align: center; }
+  .spinner { display: inline-block; width: 18px; height: 18px; border: 3px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: s .7s linear infinite; vertical-align: -3px; }
+  @keyframes s { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="card center" style="margin-top:30vh"><span class="spinner"></span></div></div>
+<script>
+/* Pega aquí la misma URL /exec de Apps Script que en index.html */
+var WEB_APP_URL = 'PEGA_AQUI_LA_URL_DE_APPS_SCRIPT';
+
+var app = document.getElementById('app');
+var token = new URLSearchParams(location.search).get('t') || '';
+var info = null, paso = 0, folio = '', edad = '', sexo = '', resp = {};
+var COLORES = ['var(--verde)', 'var(--azul)', 'var(--rosa)'];
+
+function esc(s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+async function llamar(action, params) {
+  try {
+    var r = await fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({ action: action, t: token }, params || {})) });
+    return await r.json();
+  } catch (e) { return { ok: false, error: 'No hay conexión a internet. Avísale a tu facilitador(a).' }; }
+}
+function barraSup() {
+  return '<div class="top"><img src="logo.png" alt="Monstritos A.C.">' + (info ? '<div class="grp">' + esc(info.escuela) + (info.grupo ? '<br>' + esc(info.grupo) : '') + '</div>' : '') + '</div>';
+}
+function preguntas() { return info.instrumento === 'SDQ' ? MONS.SDQ_ITEMS : MONS.ERI_ITEMS; }
+
+async function iniciar() {
+  if (!token) { app.innerHTML = barraSup() + '<div class="card"><h1>Falta el enlace</h1><p>Pide a tu facilitador(a) el enlace completo del cuestionario.</p></div>'; return; }
+  var r = await llamar('aplicarInfo');
+  if (!r.ok) { app.innerHTML = barraSup() + '<div class="card"><h1>Uy…</h1><p>' + esc(r.error) + '</p></div>'; return; }
+  info = r; bienvenida();
+}
+
+function bienvenida() {
+  var sdq = info.instrumento === 'SDQ';
+  app.innerHTML = barraSup() + '<div class="card">' +
+    '<div class="monstruos"><div class="m v"></div><div class="m a"></div><div class="m r"></div></div>' +
+    '<h1 class="center">¡Hola!</h1>' +
+    '<p>Vas a contestar unas preguntas sobre ti. <strong>Esto no es un examen</strong>: no hay respuestas buenas ni malas. Contesta con honestidad, según tu experiencia o tu forma de pensar.</p>' +
+    (sdq ? '<p>Piensa en cómo te han ido las cosas en los <strong>últimos seis meses</strong>.</p>' : '<p>Algunas preguntas son sobre los últimos 6 meses y otras sobre toda tu vida; te iremos avisando.</p>') +
+    '<p>Si alguna pregunta no la quieres contestar, puedes saltarla. Si tienes dudas, levanta la mano y pregúntale a tu facilitador(a).</p>' +
+    '<label class="l" for="fFolio">Tu folio</label><input type="text" id="fFolio" autocomplete="off" inputmode="text" value="' + esc(folio) + '" placeholder="Te lo da tu facilitador(a)">' +
+    '<label class="l" for="fEdad">Tu edad</label><input type="number" id="fEdad" min="5" max="18" inputmode="numeric" value="' + esc(edad) + '">' +
+    '<label class="l">Soy</label><div class="sexo">' + [['Mujer', 'Niña'], ['Hombre', 'Niño']].map(function (s) { return '<button class="op' + (sexo === s[0] ? ' sel' : '') + '" data-sexo="' + s[0] + '">' + s[1] + '</button>'; }).join('') + '</div>' +
+    '<div id="err"></div>' +
+    '<div class="nav"><button class="btn pri" id="go">Empezar</button></div></div>';
+  app.querySelectorAll('[data-sexo]').forEach(function (b) { b.onclick = function () { sexo = b.dataset.sexo; app.querySelectorAll('[data-sexo]').forEach(function (x) { x.classList.toggle('sel', x === b); }); }; });
+  document.getElementById('go').onclick = function () {
+    folio = document.getElementById('fFolio').value.trim(); edad = document.getElementById('fEdad').value.trim();
+    if (!folio) { document.getElementById('err').innerHTML = '<div class="error">Escribe tu folio.</div>'; return; }
+    paso = 1; pregunta();
+  };
+}
+
+function pregunta() {
+  var lista = preguntas(), it = lista[paso - 1], total = lista.length, sdq = info.instrumento === 'SDQ';
+  document.documentElement.style.setProperty('--c', COLORES[(paso - 1) % 3]);
+  var actual = resp[it.n] || '';
+  var sel = actual.split(',');
+  var ops, multiple = !sdq && it.multiple;
+  if (sdq) ops = MONS.SDQ_OPCIONES.filter(function (o) { return o.v !== 'NR'; }).map(function (o, i) { return { v: o.v, t: o.t, ico: ['✕', '½', '✓'][i] }; });
+  else ops = it.op.map(function (o) { return { v: o[0], t: o[1], ico: o[0] }; });
+  var sec = !sdq ? MONS.ERI_SECCIONES.filter(function (s) { return s.desde === it.n; })[0] : null;
+  var extras = (!sdq && it.abiertas) ? it.abiertas.map(function (a) { var vis = sel.some(function (v) { return a.si.indexOf(v) > -1; }); return '<div class="extra" data-si="' + a.si.join(',') + '" style="' + (vis ? '' : 'display:none') + '"><label class="l">' + esc(a.t) + '</label><input type="text" data-clave="' + a.clave + '" value="' + esc(resp[a.clave]) + '"></div>'; }).join('') : '';
+  var necesitaSiguiente = multiple || !!extras;
+  app.innerHTML = barraSup() +
+    '<div class="progreso"><span style="width:' + Math.round((paso - 1) * 100 / total) + '%"></span></div>' +
+    '<div class="contador">Pregunta ' + paso + ' de ' + total + '</div>' +
+    '<div class="card q">' + (sec ? '<div class="nota">' + esc(sec.texto) + '</div>' : '') +
+    '<h2>' + esc(sdq ? it.t : it.t.replace(/^En los últimos 6 meses, /, 'En los últimos 6 meses, ')) + '</h2>' +
+    (multiple ? '<p style="font-size:15px;color:var(--tinta-2);margin-top:-8px">Puedes elegir más de una.</p>' : '') +
+    '<div class="ops">' + ops.map(function (o) { return '<button class="op' + (sel.indexOf(o.v) > -1 ? ' sel' : '') + '" data-v="' + o.v + '"><span class="ico">' + esc(o.ico) + '</span><span>' + esc(o.t) + '</span></button>'; }).join('') + '</div>' +
+    extras +
+    '<button class="skip' + (actual === 'NR' ? ' sel' : '') + '" id="skip">' + (actual === 'NR' ? '✓ ' : '') + 'Prefiero no contestar esta</button>' +
+    '<div class="nav"><button class="btn sec" id="back">←</button><button class="btn pri" id="next"' + (actual ? '' : ' disabled') + '>' + (paso === total ? 'Terminar' : 'Siguiente') + '</button></div></div>';
+
+  var avanzar = function () { if (paso < total) { paso++; pregunta(); } else revisar(); };
+  var actualizarExtras = function () {
+    var s = String(resp[it.n] || '').split(',');
+    app.querySelectorAll('[data-si]').forEach(function (ex) { ex.style.display = s.some(function (v) { return ex.dataset.si.split(',').indexOf(v) > -1; }) ? '' : 'none'; });
+  };
+  app.querySelectorAll('[data-v]').forEach(function (b) {
+    b.onclick = function () {
+      if (multiple) {
+        var cur = String(resp[it.n] || '').split(',').filter(function (x) { return x && x !== 'NR'; });
+        var i = cur.indexOf(b.dataset.v); if (i > -1) cur.splice(i, 1); else cur.push(b.dataset.v);
+        resp[it.n] = cur.join(',');
+        b.classList.toggle('sel');
+      } else {
+        resp[it.n] = b.dataset.v;
+        app.querySelectorAll('[data-v]').forEach(function (x) { x.classList.toggle('sel', x === b); });
+      }
+      document.getElementById('skip').classList.remove('sel'); document.getElementById('skip').textContent = 'Prefiero no contestar esta';
+      document.getElementById('next').disabled = !resp[it.n];
+      actualizarExtras();
+      var abiertaVisible = Array.prototype.some.call(app.querySelectorAll('[data-si]'), function (x) { return x.style.display !== 'none'; });
+      if (!multiple && !abiertaVisible) setTimeout(avanzar, 220);
+    };
+  });
+  app.querySelectorAll('[data-clave]').forEach(function (inp) { inp.oninput = function () { resp[inp.dataset.clave] = inp.value.trim(); }; });
+  document.getElementById('skip').onclick = function () { resp[it.n] = 'NR'; setTimeout(avanzar, 150); };
+  document.getElementById('back').onclick = function () { if (paso > 1) { paso--; pregunta(); } else bienvenida(); };
+  document.getElementById('next').onclick = avanzar;
+}
+
+function revisar() {
+  var lista = preguntas();
+  var sinContestar = lista.filter(function (it) { return !resp[it.n]; });
+  var saltadas = lista.filter(function (it) { return resp[it.n] === 'NR'; });
+  app.innerHTML = barraSup() + '<div class="progreso"><span style="width:100%"></span></div><div class="contador">¡Listo!</div>' +
+    '<div class="card"><div class="monstruos"><div class="m v"></div><div class="m a"></div><div class="m r"></div></div>' +
+    '<h1 class="center">¡Terminaste!</h1><p class="center">Presiona <strong>Enviar</strong> para guardar tus respuestas.</p>' +
+    (sinContestar.length ? '<div class="error">Te faltan ' + sinContestar.length + ' pregunta(s): ' + sinContestar.map(function (i) { return i.n; }).join(', ') + '. Regresa con la flecha para contestarlas.</div>' : '') +
+    (saltadas.length ? '<p class="center" style="font-size:15px;color:var(--tinta-2)">Saltaste ' + saltadas.length + ' pregunta(s). Está bien.</p>' : '') +
+    '<div id="err"></div><div class="nav"><button class="btn sec" id="back">←</button><button class="btn pri" id="send"' + (sinContestar.length ? ' disabled' : '') + '>Enviar</button></div></div>';
+  document.getElementById('back').onclick = function () { paso = lista.length; pregunta(); };
+  document.getElementById('send').onclick = async function () {
+    var b = this; b.disabled = true; b.innerHTML = '<span class="spinner"></span> Enviando…';
+    var r = await llamar('aplicarGuardar', { folio: folio, edad: edad, sexo: sexo, respuestas: JSON.stringify(resp) });
+    if (!r.ok) { b.disabled = false; b.textContent = 'Enviar'; document.getElementById('err').innerHTML = '<div class="error">' + esc(r.error) + '</div>'; return; }
+    gracias();
+  };
+}
+
+function gracias() {
+  app.innerHTML = barraSup() + '<div class="card center" style="margin-top:6vh"><div class="monstruos"><div class="m v"></div><div class="m a"></div><div class="m r"></div></div>' +
+    '<h1>¡Muchas gracias!</h1><p>Tus respuestas ya se guardaron.</p>' +
+    '<p style="font-size:16px;color:var(--tinta-2)">Si algo de lo que respondiste te hizo sentir mal o te preocupa, platícalo con tu facilitador(a) o con un adulto de tu confianza. Siempre puedes pedir ayuda.</p>' +
+    '<div class="nav"><button class="btn sec" id="otro" style="flex:1">Siguiente compañero(a)</button></div></div>';
+  document.getElementById('otro').onclick = function () { paso = 0; folio = ''; edad = ''; sexo = ''; resp = {}; bienvenida(); };
+}
+
+iniciar();
+</script>
+</body>
+</html>

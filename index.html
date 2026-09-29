@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plataforma Monstritos</title>
+<link rel="icon" href="icono.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="puntuacion.js"></script>
+<style>
+  :root {
+    --verde: #71CB47; --verde-osc: #3F8F1F; --verde-claro: #EAF7E2;
+    --azul: #4FAFEA; --azul-osc: #1C6FA8; --azul-claro: #E5F3FC;
+    --rosa: #DB5183; --rosa-osc: #A8315D; --rosa-claro: #FBE7EF;
+    --ambar: #E9A21B; --ambar-osc: #8A5A00; --ambar-claro: #FDF1D8;
+    --tinta: #141718; --tinta-2: #4A5053; --tinta-3: #7A8285;
+    --bg: #F5F8F3; --card: #FFFFFF; --borde: #E1E8DD; --borde-2: #CFD9CA;
+    --radio: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { font-family: "Nunito", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; background: var(--bg); color: var(--tinta); font-size: 15px; line-height: 1.45; }
+  h1, h2, h3, .fredoka, button, .tabs, .chip, .kpi .num { font-family: "Fredoka", "Nunito", system-ui, sans-serif; }
+  h1 { font-size: 26px; margin: 0 0 4px; font-weight: 700; letter-spacing: -0.2px; }
+  h2 { font-size: 19px; margin: 0 0 12px; font-weight: 600; }
+  h3 { font-size: 16px; margin: 20px 0 8px; font-weight: 600; }
+  a { color: var(--azul-osc); }
+  .subtle { color: var(--tinta-2); font-size: 14px; margin: 0 0 12px; max-width: 72ch; }
+  .muted { color: var(--tinta-3); font-size: 13px; }
+
+  /* ---------- barra superior ---------- */
+  header.topbar { background: #fff; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 20px; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--tinta); }
+  .brand img { height: 46px; width: auto; display: block; }
+  .brand .tag { font-family: "Fredoka"; font-weight: 600; font-size: 13px; color: var(--tinta-2); border-left: 2px solid var(--borde); padding-left: 12px; line-height: 1.15; }
+  .userbox { display: flex; align-items: center; gap: 10px; font-size: 14px; flex-wrap: wrap; }
+  .stripe { height: 6px; display: flex; }
+  .stripe span { flex: 1; } .stripe span:nth-child(1) { background: var(--verde); } .stripe span:nth-child(2) { background: var(--azul); } .stripe span:nth-child(3) { background: var(--rosa); }
+  nav.tabs { display: flex; gap: 2px; background: #fff; padding: 0 14px; border-bottom: 1px solid var(--borde); overflow-x: auto; }
+  nav.tabs button { background: none; border: none; padding: 13px 14px 11px; cursor: pointer; font-size: 15px; color: var(--tinta-2); border-bottom: 4px solid transparent; font-weight: 600; white-space: nowrap; border-radius: 0; }
+  nav.tabs button:hover { color: var(--tinta); }
+  nav.tabs button.active { color: var(--tinta); border-bottom-color: var(--verde); }
+  nav.tabs button .count { background: var(--rosa); color: #fff; border-radius: 20px; font-size: 11px; padding: 1px 7px; margin-left: 6px; }
+  main { max-width: 1120px; margin: 0 auto; padding: 22px 16px 70px; }
+
+  .card { background: var(--card); border: 1px solid var(--borde); border-radius: var(--radio); padding: 20px; margin-bottom: 18px; }
+  .card.pad-s { padding: 14px 16px; }
+
+  /* ---------- formularios ---------- */
+  label { display: block; font-size: 13px; font-weight: 700; margin: 12px 0 5px; color: var(--tinta); }
+  input[type=text], input[type=email], input[type=password], input[type=date], input[type=number], input[type=search], select, textarea {
+    width: 100%; padding: 10px 12px; border: 1.5px solid var(--borde-2); border-radius: 10px; font-size: 15px; font-family: inherit; background: #fff; color: var(--tinta);
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--azul); box-shadow: 0 0 0 3px var(--azul-claro); }
+  textarea { min-height: 70px; resize: vertical; }
+  .row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .row > div { flex: 1; min-width: 160px; }
+
+  /* ---------- botones ---------- */
+  button { cursor: pointer; font-size: 14px; font-weight: 600; border-radius: 11px; border: none; transition: background .15s, transform .05s; }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .btn { padding: 10px 16px; display: inline-flex; align-items: center; gap: 6px; }
+  .btn.primary { background: var(--tinta); color: #fff; }
+  .btn.primary:hover { background: #2c3235; }
+  .btn.verde { background: var(--verde); color: var(--tinta); }
+  .btn.verde:hover { background: #63B93C; }
+  .btn.sec { background: #fff; color: var(--tinta); border: 1.5px solid var(--borde-2); }
+  .btn.sec:hover { border-color: var(--tinta-3); }
+  .btn.peligro { background: #fff; color: var(--rosa-osc); border: 1.5px solid #F0BCD0; }
+  .btn.s { padding: 6px 11px; font-size: 13px; border-radius: 9px; }
+  .btn.link { background: none; color: var(--azul-osc); padding: 4px 6px; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  .toolbar.between { justify-content: space-between; }
+  .toolbar .grow { flex: 1; }
+
+  /* ---------- tablas ---------- */
+  .tabla-wrap { overflow-x: auto; margin-top: 8px; border: 1px solid var(--borde); border-radius: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; background: #fff; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--borde); vertical-align: middle; }
+  th { color: var(--tinta-2); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .4px; background: #FAFCF9; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.acc { white-space: nowrap; text-align: right; }
+
+  /* ---------- chips ---------- */
+  .chip { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .chip.bajo, .chip.normal, .chip.ok { background: var(--verde-claro); color: var(--verde-osc); }
+  .chip.medio, .chip.limite, .chip.warn { background: var(--ambar-claro); color: var(--ambar-osc); }
+  .chip.alto, .chip.anormal, .chip.err { background: var(--rosa-claro); color: var(--rosa-osc); }
+  .chip.info { background: var(--azul-claro); color: var(--azul-osc); }
+  .chip.gris { background: #EEF1ED; color: var(--tinta-2); }
+  .chip.admin { background: var(--rosa-claro); color: var(--rosa-osc); }
+  .chip.operativo { background: var(--azul-claro); color: var(--azul-osc); }
+
+  .msg { padding: 11px 14px; border-radius: 10px; font-size: 14px; margin-top: 12px; }
+  .msg.error { background: var(--rosa-claro); color: var(--rosa-osc); }
+  .msg.ok { background: var(--verde-claro); color: var(--verde-osc); }
+  .msg.info { background: var(--azul-claro); color: var(--azul-osc); }
+  .msg.warn { background: var(--ambar-claro); color: var(--ambar-osc); }
+  .msg ul { margin: 6px 0 0; padding-left: 20px; }
+  .hidden { display: none !important; }
+
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .cargando { padding: 40px; text-align: center; color: var(--tinta-2); }
+
+  /* ---------- login ---------- */
+  .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; background:
+    radial-gradient(circle at 12% 18%, var(--verde-claro) 0 120px, transparent 121px),
+    radial-gradient(circle at 88% 80%, var(--rosa-claro) 0 150px, transparent 151px),
+    radial-gradient(circle at 85% 12%, var(--azul-claro) 0 90px, transparent 91px), var(--bg); }
+  .login-card { max-width: 400px; width: 100%; background: #fff; border-radius: 22px; padding: 28px 26px; border: 1px solid var(--borde); }
+  .login-card img { width: 220px; display: block; margin: 0 auto 6px; }
+  .login-card .sub { text-align: center; color: var(--tinta-2); margin: 0 0 8px; }
+
+  /* ---------- modal ---------- */
+  .modal-bg { position: fixed; inset: 0; background: rgba(20,23,24,.45); display: flex; align-items: flex-start; justify-content: center; padding: 28px 12px; overflow-y: auto; z-index: 50; }
+  .modal { background: #fff; border-radius: 18px; padding: 22px; max-width: 580px; width: 100%; }
+  .modal.wide { max-width: 980px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; position: sticky; bottom: -22px; background: #fff; padding: 12px 0; border-top: 1px solid var(--borde); }
+
+  /* ---------- proyecto ---------- */
+  .breadcrumb { font-size: 14px; color: var(--tinta-2); margin-bottom: 10px; }
+  .breadcrumb button { background: none; padding: 0; color: var(--azul-osc); font-family: inherit; font-weight: 700; }
+  .proy-head { display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
+  .proy-meta { display: flex; gap: 14px; flex-wrap: wrap; font-size: 14px; color: var(--tinta-2); margin-top: 4px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 16px; }
+  .kpi { border-radius: 12px; padding: 12px 14px; background: #FAFCF9; border: 1px solid var(--borde); }
+  .kpi .num { font-size: 26px; font-weight: 700; line-height: 1.1; }
+  .kpi .lbl { font-size: 13px; color: var(--tinta-2); }
+  .kpi.v { border-top: 4px solid var(--verde); } .kpi.a { border-top: 4px solid var(--azul); } .kpi.r { border-top: 4px solid var(--rosa); } .kpi.n { border-top: 4px solid var(--tinta); }
+  .subtabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 16px; }
+  .subtabs button { background: #fff; border: 1.5px solid var(--borde-2); padding: 8px 14px; color: var(--tinta-2); border-radius: 30px; }
+  .subtabs button.active { background: var(--tinta); color: #fff; border-color: var(--tinta); }
+  .subtabs button .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
+
+  /* ---------- captura de cuestionarios ---------- */
+  .q-grid { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  .q-grid th { position: sticky; top: -22px; background: #fff; z-index: 2; font-size: 11px; text-align: center; }
+  .q-grid th:first-child { text-align: left; }
+  .q-grid td { padding: 7px 8px; border-bottom: 1px solid var(--borde); font-size: 14px; }
+  .q-grid td.opt { text-align: center; width: 88px; }
+  .q-grid tr.falta td:first-child { box-shadow: inset 4px 0 0 var(--rosa); }
+  .q-grid input[type=radio] { width: 20px; height: 20px; accent-color: var(--tinta); cursor: pointer; }
+  .q-grid .inv { font-size: 11px; color: var(--tinta-3); }
+  .preg { border: 1px solid var(--borde); border-radius: 12px; padding: 12px 14px; margin-top: 10px; }
+  .preg.falta { border-color: #F0BCD0; background: #FFF9FB; }
+  .preg.alerta-on { border-color: var(--rosa); box-shadow: 0 0 0 2px var(--rosa-claro); }
+  .preg .enun { font-weight: 700; margin-bottom: 8px; }
+  .preg .ops { display: flex; flex-wrap: wrap; gap: 6px; }
+  .preg .ops label { margin: 0; font-weight: 600; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; border: 1.5px solid var(--borde-2); padding: 6px 11px; border-radius: 20px; cursor: pointer; background: #fff; }
+  .preg .ops label:has(input:checked) { background: var(--tinta); color: #fff; border-color: var(--tinta); }
+  .preg .ops input { accent-color: var(--verde); margin: 0; }
+  .preg .extra { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+  .preg .extra > div { flex: 1; min-width: 180px; }
+  .seccion-nota { background: var(--azul-claro); color: var(--azul-osc); border-radius: 10px; padding: 8px 12px; font-size: 14px; font-weight: 600; margin-top: 18px; }
+  .preview { position: sticky; top: -22px; z-index: 3; background: #fff; padding: 10px 0; border-bottom: 1px solid var(--borde); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; }
+  .quick { background: #FAFCF9; border: 1px dashed var(--borde-2); border-radius: 12px; padding: 10px 12px; margin-top: 12px; }
+  .quick input { font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: 2px; }
+
+  /* ---------- análisis ---------- */
+  .barra { display: flex; height: 22px; border-radius: 7px; overflow: hidden; background: #EEF1ED; min-width: 160px; }
+  .barra span { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--tinta); white-space: nowrap; overflow: hidden; }
+  .barra .b0 { background: var(--verde); } .barra .b1 { background: #F4C95D; } .barra .b2 { background: var(--rosa); color: #fff; }
+  .leyenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--tinta-2); margin: 6px 0; }
+  .leyenda i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+  .tile { border: 1px solid var(--borde); border-radius: 12px; padding: 14px; }
+  .tile h3 { margin-top: 0; }
+  .delta-baja { color: var(--verde-osc); font-weight: 700; } .delta-sube { color: var(--rosa-osc); font-weight: 700; }
+
+  .qr-box { display: inline-block; padding: 10px; background: #fff; border: 1px solid var(--borde); border-radius: 12px; }
+  .enlace-url { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; word-break: break-all; background: #FAFCF9; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--borde); }
+
+  @media (max-width: 640px) {
+    header.topbar { padding: 8px 14px; }
+    .brand img { height: 36px; }
+    .brand .tag { display: none; }
+    .card { padding: 16px 14px; }
+    h1 { font-size: 22px; }
+    .q-grid td.opt { width: 44px; }
+    .q-grid th span.full { display: none; }
+  }
+  @media (min-width: 641px) { .q-grid th span.corto { display: none; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* ============================================================
+ * CONFIGURACIÓN — pega aquí la URL /exec de tu implementación de
+ * Apps Script (Implementar → Administrar implementaciones).
+ * ============================================================ */
+var WEB_APP_URL = 'PEGA_AQUI_LA_URL_DE_APPS_SCRIPT';
+
+var ESTADOS_MX = ['Aguascalientes','Baja California','Baja California Sur','Campeche','Chiapas','Chihuahua','Ciudad de México','Coahuila','Colima','Durango','Estado de México','Guanajuato','Guerrero','Hidalgo','Jalisco','Michoacán','Morelos','Nayarit','Nuevo León','Oaxaca','Puebla','Querétaro','Quintana Roo','San Luis Potosí','Sinaloa','Sonora','Tabasco','Tamaulipas','Tlaxcala','Veracruz','Yucatán','Zacatecas'];
+var ESTATUS_PROYECTO = ['Activo', 'Pausado', 'Cerrado'];
+var TIPOS_VISITA = ['Visita domiciliaria', 'Entrevista en escuela', 'Llamada telefónica', 'Taller con familias', 'Otro'];
+var RELACIONES = ['Madre', 'Padre', 'Hermano o hermana', 'Abuelo o abuela', 'Tío o tía', 'Otro tutor'];
+var ESTATUS_ALERTA = ['Pendiente', 'En seguimiento', 'Canalizada', 'Atendida'];
+
+var root = document.getElementById('app');
+var session = null;
+try { session = JSON.parse(localStorage.getItem('monstritos_session') || 'null'); } catch (e) { session = null; }
+var state = { view: 'proyectos', proyectos: [], proy: null, datos: null, sub: 'participantes', momentoAnalisis: 'Base', alertas: [], filtroAlertas: 'abiertas' };
+
+/* ======================= UTILIDADES ======================= */
+function esc(s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function $(id) { return document.getElementById(id); }
+function el(html) { var d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstElementChild; }
+function hoy() { var d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); }
+function pct(n, d) { return d ? Math.round(n * 1000 / d) / 10 : 0; }
+function fmt1(n) { return n === null || n === undefined || isNaN(n) ? '—' : (Math.round(n * 10) / 10).toString(); }
+function claseBanda(b) { return { 'Normal': 'normal', 'Límite': 'limite', 'Anormal': 'anormal', 'BAJO': 'bajo', 'MEDIO': 'medio', 'ALTO': 'alto' }[b] || 'gris'; }
+function chipBanda(b, txt) { return b ? '<span class="chip ' + claseBanda(b) + '">' + esc(txt !== undefined ? txt : b) + '</span>' : '<span class="chip gris">—</span>'; }
+function cmpFolio(a, b) { return String(a).localeCompare(String(b), 'es', { numeric: true }); }
+
+async function sha256(str) {
+  var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+}
+
+async function llamar(action, params) {
+  if (WEB_APP_URL.indexOf('http') !== 0) return { ok: false, error: 'Falta configurar WEB_APP_URL en index.html (la URL /exec de Apps Script).' };
+  var body = Object.assign({ action: action }, params || {});
+  try {
+    var r = await fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) });
+    return await r.json();
+  } catch (e) {
+    return { ok: false, error: 'No se pudo conectar con la plataforma. Revisa tu conexión a internet e intenta de nuevo.' };
+  }
+}
+async function api(action, params) {
+  params = params || {}; params.token = session ? session.token : '';
+  var r = await llamar(action, params);
+  if (!r.ok && r.error && /sesión inválida|expirada/i.test(r.error)) { cerrarSesion(); render(); }
+  return r;
+}
+function guardarSesion(d) { session = { token: d.token, email: d.email, nombre: d.nombre, rol: d.rol }; try { localStorage.setItem('monstritos_session', JSON.stringify(session)); } catch (e) { } }
+function cerrarSesion() { session = null; try { localStorage.removeItem('monstritos_session'); } catch (e) { } state.view = 'proyectos'; state.proy = null; state.datos = null; }
+function esAdmin() { return session && session.rol === 'Administrador'; }
+
+function conSpinner(btn, texto) { var prev = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> ' + (texto || 'Guardando…'); return function () { btn.disabled = false; btn.innerHTML = prev; }; }
+function abrirModal(html) { var m = el('<div class="modal-bg">' + html + '</div>'); document.body.appendChild(m); m.addEventListener('mousedown', function (e) { if (e.target === m) m.dataset.down = '1'; }); return m; }
+function toast(txt, tipo) {
+  var t = el('<div class="msg ' + (tipo || 'ok') + '" style="position:fixed;right:16px;bottom:16px;z-index:99;max-width:340px;box-shadow:0 6px 24px rgba(0,0,0,.12)">' + esc(txt) + '</div>');
+  document.body.appendChild(t); setTimeout(function () { t.remove(); }, 3200);
+}
+
+/* ======================= RENDER RAÍZ ======================= */
+function render() { if (!session) renderLogin(); else renderApp(); }
+
+function renderLogin() {
+  root.innerHTML =
+    '<div class="login-wrap"><div class="login-card">' +
+      '<img src="logo.png" alt="Monstritos A.C.">' +
+      '<p class="sub">Plataforma de seguimiento · acceso para el equipo</p>' +
+      '<label for="lEmail">Correo</label><input type="email" id="lEmail" autocomplete="username" placeholder="tu@correo.com">' +
+      '<label for="lPass">Contraseña</label><input type="password" id="lPass" autocomplete="current-password" placeholder="••••••••">' +
+      '<button class="btn primary" id="btnLogin" style="width:100%;justify-content:center;margin-top:18px;padding:12px">Entrar</button>' +
+      '<div id="lMsg"></div>' +
+    '</div></div>';
+  var go = async function () {
+    var email = $('lEmail').value.trim(), pass = $('lPass').value;
+    if (!email || !pass) { $('lMsg').innerHTML = '<div class="msg error">Escribe tu correo y contraseña.</div>'; return; }
+    var fin = conSpinner($('btnLogin'), 'Entrando…');
+    var r = await llamar('login', { email: email, passHash: await sha256(pass) });
+    fin();
+    if (!r.ok) { $('lMsg').innerHTML = '<div class="msg error">' + esc(r.error) + '</div>'; return; }
+    guardarSesion(r); render();
+  };
+  $('btnLogin').onclick = go;
+  ['lEmail', 'lPass'].forEach(function (id) { $(id).addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); }); });
+}
+
+function renderApp() {
+  var pend = state.alertas.filter(function (a) { return a.estatus !== 'Atendida'; }).length;
+  var tabs = [['proyectos', 'Grupos y proyectos'], ['alertas', 'Alertas' + (pend ? '<span class="count">' + pend + '</span>' : '')], ['instrumentos', 'Instrumentos']];
+  if (esAdmin()) tabs.push(['usuarios', 'Usuarios']);
+  tabs.push(['cuenta', 'Mi cuenta']);
+  root.innerHTML =
+    '<header class="topbar">' +
+      '<a class="brand" href="#" id="brandHome"><img src="logo.png" alt="Monstritos A.C."><span class="tag">Plataforma de<br>seguimiento</span></a>' +
+      '<div class="userbox"><span>' + esc(session.nombre) + '</span><span class="chip ' + (esAdmin() ? 'admin' : 'operativo') + '">' + esc(session.rol) + '</span>' +
+      '<button class="btn sec s" id="btnSalir">Cerrar sesión</button></div>' +
+    '</header>' +
+    '<div class="stripe"><span></span><span></span><span></span></div>' +
+    '<nav class="tabs">' + tabs.map(function (t) { return '<button data-tab="' + t[0] + '" class="' + (state.view === t[0] ? 'active' : '') + '">' + t[1] + '</button>'; }).join('') + '</nav>' +
+    '<main id="main"></main>';
+  $('btnSalir').onclick = function () { cerrarSesion(); render(); };
+  $('brandHome').onclick = function (e) { e.preventDefault(); state.view = 'proyectos'; state.proy = null; renderApp(); };
+  root.querySelectorAll('nav.tabs button').forEach(function (b) {
+    b.onclick = function () { state.view = b.dataset.tab; if (state.view === 'proyectos') { state.proy = null; } renderApp(); };
+  });
+  renderMain();
+}
+
+function renderMain() {
+  var v = state.view;
+  if (v === 'proyectos') { if (state.proy) renderProyecto(); else renderProyectos(); }
+  else if (v === 'alertas') renderAlertas();
+  else if (v === 'instrumentos') renderInstrumentos();
+  else if (v === 'usuarios' && esAdmin()) renderUsuarios();
+  else if (v === 'cuenta') renderCuenta();
+}
+
+/* ======================= PROYECTOS ======================= */
+async function renderProyectos() {
+  var main = $('main');
+  main.innerHTML = '<div class="cargando"><span class="spinner"></span> Cargando grupos…</div>';
+  var r = await api('listarProyectos');
+  if (!r.ok) { main.innerHTML = '<div class="msg error">' + esc(r.error) + '</div>'; return; }
+  state.proyectos = r.data;
+  api('listarAlertas').then(function (ra) { if (ra.ok) { var antes = state.alertas.length; state.alertas = ra.data; if (antes !== ra.data.length && state.view === 'proyectos' && !state.proy) { var n = document.querySelector('nav.tabs button[data-tab=alertas]'); if (n) { var p = ra.data.filter(function (a) { return a.estatus !== 'Atendida'; }).length; n.innerHTML = 'Alertas' + (p ? '<span class="count">' + p + '</span>' : ''); } } } });
+  var filtro = state.filtroProy || 'Activo';
+  var lista = r.data.filter(function (p) { return filtro === 'Todos' || (p.estatus || 'Activo') === filtro; });
+  var filas = lista.map(function (p) {
+    return '<tr><td><strong>' + esc(p.escuela) + '</strong><div class="muted">' + esc(p.codigo) + '</div></td>' +
+      '<td>' + esc(p.grupo || '—') + '</td><td>' + esc(p.ciclo || '—') + '</td>' +
+      '<td>' + esc([p.municipio, p.estado].filter(Boolean).join(', ') || '—') + '</td>' +
+      '<td class="num">' + p.nParticipantes + '</td><td class="num">' + p.nSDQ + '</td><td class="num">' + p.nERI + '</td>' +
+      '<td>' + (p.nAlertas ? '<span class="chip alto">' + p.nAlertas + ' abierta' + (p.nAlertas > 1 ? 's' : '') + '</span>' : '<span class="muted">—</span>') + '</td>' +
+      '<td>' + chipEstatus(p.estatus) + '</td>' +
+      '<td class="acc"><button class="btn primary s" data-abrir="' + esc(p.codigo) + '">Abrir</button></td></tr>';
+  }).join('');
+  main.innerHTML =
+    '<div class="card">' +
+      '<div class="toolbar between"><div><h1>Grupos y proyectos</h1><p class="subtle" style="margin:0">Cada grupo escolar donde Monstritos aplica el SDQ y el ERI es un proyecto. Ábrelo para capturar, analizar y dar seguimiento.</p></div>' +
+      '<button class="btn verde" id="btnNuevoProy">+ Nuevo grupo</button></div>' +
+      '<div class="toolbar"><span class="muted">Mostrar:</span>' + ['Activo', 'Pausado', 'Cerrado', 'Todos'].map(function (f) { return '<button class="btn s ' + (f === filtro ? 'primary' : 'sec') + '" data-filtro="' + f + '">' + f + (f === 'Todos' ? '' : 's') + '</button>'; }).join('') + '</div>' +
+      (lista.length ? '<div class="tabla-wrap"><table><thead><tr><th>Escuela / sede</th><th>Grupo</th><th>Ciclo</th><th>Ubicación</th><th class="num">Niñas y niños</th><th class="num">SDQ</th><th class="num">ERI</th><th>Alertas</th><th>Estatus</th><th></th></tr></thead><tbody>' + filas + '</tbody></table></div>'
+        : '<div class="msg info">No hay grupos ' + (filtro === 'Todos' ? '' : 'con estatus "' + filtro + '" ') + 'todavía. Crea el primero con "+ Nuevo grupo".</div>') +
+    '</div>';
+  $('btnNuevoProy').onclick = function () { modalProyecto(null); };
+  main.querySelectorAll('[data-filtro]').forEach(function (b) { b.onclick = function () { state.filtroProy = b.dataset.filtro; renderProyectos(); }; });
+  main.querySelectorAll('[data-abrir]').forEach(function (b) { b.onclick = function () { abrirProyecto(b.dataset.abrir); }; });
+}
+function chipEstatus(e) { e = e || 'Activo'; return '<span class="chip ' + ({ Activo: 'ok', Pausado: 'warn', Cerrado: 'gris' }[e] || 'gris') + '">' + esc(e) + '</span>'; }
+
+function modalProyecto(p) {
+  var ed = !!p; p = p || {};
+  var m = abrirModal('<div class="modal">' +
+    '<h2>' + (ed ? 'Editar grupo' : 'Nuevo grupo') + '</h2>' +
+    '<label>Escuela o sede *</label><input type="text" id="pEsc" value="' + esc(p.escuela) + '" placeholder="ej. Primaria Benito Juárez">' +
+    '<div class="row"><div><label>Grupo</label><input type="text" id="pGrupo" value="' + esc(p.grupo) + '" placeholder="ej. 5° A"></div>' +
+    '<div><label>Ciclo escolar</label><input type="text" id="pCiclo" value="' + esc(p.ciclo) + '" placeholder="ej. 2026-2027"></div></div>' +
+    '<div class="row"><div><label>Estado</label><select id="pEstado"><option value="">Selecciona…</option>' + ESTADOS_MX.map(function (e) { return '<option' + (p.estado === e ? ' selected' : '') + '>' + e + '</option>'; }).join('') + '</select></div>' +
+    '<div><label>Municipio / alcaldía</label><input type="text" id="pMun" value="' + esc(p.municipio) + '"></div></div>' +
+    '<div class="row"><div><label>Responsable</label><input type="text" id="pResp" value="' + esc(p.responsable || (ed ? '' : session.nombre)) + '"></div>' +
+    '<div><label>Fecha de inicio</label><input type="date" id="pFecha" value="' + esc(p.fechaInicio || (ed ? '' : hoy())) + '"></div></div>' +
+    '<label>Estatus</label><select id="pEstatus">' + ESTATUS_PROYECTO.map(function (e) { return '<option' + ((p.estatus || 'Activo') === e ? ' selected' : '') + '>' + e + '</option>'; }).join('') + '</select>' +
+    '<label>Notas</label><textarea id="pNotas">' + esc(p.notas) + '</textarea>' +
+    '<div id="pMsg"></div>' +
+    '<div class="modal-actions"><button class="btn sec" data-x>Cancelar</button><button class="btn primary" id="pOk">Guardar</button></div></div>');
+  m.querySelector('[data-x]').onclick = function () { m.remove(); };
+  $('pOk').onclick = async function () {
+    if (!$('pEsc').value.trim()) { $('pMsg').innerHTML = '<div class="msg error">Escribe la escuela o sede.</div>'; return; }
+    var fin = conSpinner(this);
+    var r = await api('guardarProyecto', { codigo: p.codigo || '', escuela: $('pEsc').value, grupo: $('pGrupo').value, ciclo: $('pCiclo').value, estado: $('pEstado').value, municipio: $('pMun').value, responsable: $('pResp').value, fechaInicio: $('pFecha').value, estatus: $('pEstatus').value, notas: $('pNotas').value });
+    fin();
+    if (!r.ok) { $('pMsg').innerHTML = '<div class="msg error">' + esc(r.error) + '</div>'; return; }
+    m.remove();
+    if (ed) await recargarProyecto(); else abrirProyecto(r.codigo);
+  };
+}
+
+async function abrirProyecto(codigo) {
+  state.proy = codigo; state.sub = state.sub || 'participantes';
+  $('main').innerHTML = '<div class="cargando"><span class="spinner"></span> Abriendo grupo…</div>';
+  await recargarProyecto();
+}
+async function recargarProyecto() {
+  var r = await api('cargarProyecto', { proyecto: state.proy });
+  if (!r.ok) { $('main').innerHTML = '<div class="msg error">' + esc(r.error) + '</div>'; return; }
+  r.sdq.forEach(function (x) { x.cal = MONS.calificarSDQ(x.respuestas); });
+  r.eri.forEach(function (x) { x.cal = MONS.calificarERI(x.respuestas); });
+  r.participantes.sort(function (a, b) { return cmpFolio(a.folio, b.folio); });
+  state.datos = r;
+  renderProyecto();
+}
+
+var SUBTABS = [
+  ['participantes', 'Niñas y niños', 'var(--tinta)'], ['sdq', 'SDQ · Capacidades y dificultades', 'var(--azul)'], ['eri', 'ERI · Evaluación de riesgo', 'var(--rosa)'],
+  ['familias', 'Datos de familia', 'var(--verde)'], ['visitas', 'Visitas familiares', 'var(--verde)'], ['analisis', 'Análisis y comparativo', 'var(--azul)'], ['enlaces', 'Enlaces de aplicación', 'var(--tinta-3)']
+];
+
+function renderProyecto() {
+  var d = state.datos, p = d.proyecto;
+  var cuenta = function (lista, m) { return lista.filter(function (x) { return x.momento === m; }).length; };
+  var alertasAb = d.alertas.filter(function (a) { return a.estatus !== 'Atendida'; }).length;
+  $('main').innerHTML =
+    '<div class="breadcrumb"><button id="bcBack">← Grupos y proyectos</button></div>' +
+    '<div class="card">' +
+      '<div class="proy-head"><div><h1>' + esc(p.escuela) + (p.grupo ? ' · ' + esc(p.grupo) : '') + '</h1>' +
+      '<div class="proy-meta"><span>' + esc(p.codigo) + '</span>' + (p.ciclo ? '<span>Ciclo ' + esc(p.ciclo) + '</span>' : '') + (p.municipio || p.estado ? '<span>' + esc([p.municipio, p.estado].filter(Boolean).join(', ')) + '</span>' : '') + (p.responsable ? '<span>Responsable: ' + esc(p.responsable) + '</span>' : '') + chipEstatus(p.estatus) + '</div></div>' +
+      '<button class="btn sec s" id="btnEditProy">Editar datos del grupo</button></div>' +
+      '<div class="kpis">' +
+        '<div class="kpi n"><div class="num">' + d.participantes.length + '</div><div class="lbl">niñas y niños en la lista</div></div>' +
+        '<div class="kpi a"><div class="num">' + cuenta(d.sdq, 'Base') + ' / ' + cuenta(d.sdq, 'Final') + '</div><div class="lbl">SDQ capturados (base / final)</div></div>' +
+        '<div class="kpi r"><div class="num">' + cuenta(d.eri, 'Base') + ' / ' + cuenta(d.eri, 'Final') + '</div><div class="lbl">ERI capturados (base / final)</div></div>' +
+        '<div class="kpi v"><div class="num">' + d.visitas.length + '</div><div class="lbl">visitas familiares registradas</div></div>' +
+        (alertasAb ? '<div class="kpi r" style="background:var(--rosa-claro)"><div class="num" style="color:var(--rosa-osc)">' + alertasAb + '</div><div class="lbl">alerta(s) abiertas — ver pestaña Alertas</div></div>' : '') +
+      '</div>' +
+    '</div>' +
+    '<div class="subtabs">' + SUBTABS.map(function (t) { return '<button data-sub="' + t[0] + '" class="' + (state.sub === t[0] ? 'active' : '') + '"><span class="dot" style="background:' + t[2] + '"></span>' + t[1] + '</button>'; }).join('') + '</div>' +
+    '<div class="card" id="subContent"></div>';
+  $('bcBack').onclick = function () { state.proy = null; renderApp(); };
+  $('btnEditProy').onclick = function () { modalProyecto(p); };
+  document.querySelectorAll('[data-sub]').forEach(function (b) { b.onclick = function () { state.sub = b.dataset.sub; renderProyecto(); }; });
+  ({ participantes: subParticipantes, sdq: subSDQ, eri: subERI, familias: subFamilias, visitas: subVisitas, analisis: subAnalisis, enlaces: subEnlaces })[state.sub]();
+}
+
+/* ======================= PARTICIPANTES ======================= */
+function subParticipantes() {
+  var d = state.datos, box = $('subContent');
+  var tiene = function (lista, folio, m) { return lista.some(function (x) { return x.folio === folio && x.momento === m; }); };
+  var filas = d.participantes.map(function (x) {
+    var nVis = d.visitas.filter(function (v) { return v.folio === x.folio; }).length;
+    var fam = d.familias.some(function (f) { return f.folio === x.folio; });
+    var eriB = d.eri.filter(function (e) { return e.folio === x.folio && e.momento === 'Base'; })[0];
+    var marca = function (ok) { return ok ? '<span class="chip ok">✓</span>' : '<span class="chip gris">—</span>'; };
+    return '<tr><td><strong>' + esc(x.folio) + '</strong></td><td>' + esc(x.nombre || '—') + '</td><td class="num">' + esc(x.edad || '—') + '</td><td>' + esc(x.sexo || '—') + '</td>' +
+      '<td>' + marca(tiene(d.sdq, x.folio, 'Base')) + ' ' + marca(tiene(d.sdq, x.folio, 'Final')) + '</td>' +
+      '<td>' + marca(!!eriB) + ' ' + marca(tiene(d.eri, x.folio, 'Final')) + '</td>' +
+      '<td>' + (eriB ? chipBanda(eriB.cal.riesgoGlobal) : '<span class="muted">—</span>') + '</td>' +
+      '<td>' + marca(fam) + '</td><td class="num">' + nVis + '</td>' +
+      '<td class="acc"><button class="btn sec s" data-ed="' + esc(x.folio) + '">Editar</button> <button class="btn peligro s" data-del="' + esc(x.folio) + '">Quitar</button></td></tr>';
+  }).join('');
+  box.innerHTML =
+    '<div class="toolbar between"><div><h2 style="margin:0">Niñas y niños del grupo</h2><p class="subtle" style="margin:4px 0 0">La lista usa el <strong>folio</strong> como identificador; el nombre es opcional y nunca sale en las descargas de los cuestionarios.</p></div>' +
+    '<div class="toolbar" style="margin:0"><button class="btn sec" id="btnPlantilla">Plantilla Excel</button><button class="btn sec" id="btnImportar">Importar lista</button><button class="btn verde" id="btnNuevoPart">+ Agregar</button></div></div>' +
+    '<input type="file" id="fileImport" accept=".xlsx,.xls,.csv" class="hidden">' +
+    (d.participantes.length ? '<div class="tabla-wrap"><table><thead><tr><th>Folio</th><th>Nombre</th><th class="num">Edad</th><th>Sexo</th><th>SDQ base · final</th><th>ERI base · final</th><th>Riesgo global (base)</th><th>Familia</th><th class="num">Visitas</th><th></th></tr></thead><tbody>' + filas + '</tbody></table></div>'
+      : '<div class="msg info">Todavía no hay nadie en la lista. Agrégalos uno por uno, importa un Excel/CSV con columnas <em>folio, nombre, edad, sexo</em>, o simplemente captura los cuestionarios: cada folio nuevo se agrega solo.</div>') +
+    '<div id="impMsg"></div>';
+  $('btnNuevoPart').onclick = function () { modalParticipante(null); };
+  $('btnPlantilla').onclick = function () {
+    var ws = XLSX.utils.aoa_to_sheet([['folio', 'nombre', 'edad', 'sexo'], ['01', 'Nombre opcional', 10, 'Mujer'], ['02', '', 11, 'Hombre']]);
+    var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Lista'); XLSX.writeFile(wb, 'Plantilla_lista_Monstritos.xlsx');
+  };
+  $('btnImportar').onclick = function () { $('fileImport').click(); };
+  $('fileImport').onchange = async function (e) {
+    var f = e.target.files[0]; if (!f) return;
+    var buf = await f.arrayBuffer();
+    var wb = XLSX.read(buf, { type: 'array' });
+    var rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '', raw: false });
+    var filas = rows.map(function (r) {
+      var o = {}; Object.keys(r).forEach(function (k) { o[k.toLowerCase().trim()] = String(r[k]).trim(); });
+      return { folio: o.folio || o.id || '', nombre: o.nombre || '', edad: o.edad || '', sexo: normSexo(o.sexo || '') };
+    }).filter(function (x) { return x.folio; });
+    if (!filas.length) { $('impMsg').innerHTML = '<div class="msg error">No encontré una columna "folio" con datos en el archivo.</div>'; return; }
+    $('impMsg').innerHTML = '<div class="msg info"><span class="spinner"></span> Importando ' + filas.length + ' registros…</div>';
+    var r = await api('importarParticipantes', { proyecto: state.proy, filas: JSON.stringify(filas) });
+    if (!r.ok) { $('impMsg').innerHTML = '<div class="msg error">' + esc(r.error) + '</div>'; return; }
+    toast('Importados: ' + r.nuevos + ' nuevos, ' + r.actualizados + ' actualizados.');
+    await recargarProyecto();
+  };
+  box.querySelectorAll('[data-ed]').forEach(function (b) { b.onclick = function () { modalParticipante(d.participantes.filter(function (x) { return x.folio === b.dataset.ed; })[0]); }; });
+  box.querySelectorAll('[data-del]').forEach(function (b) {
+    b.onclick = async function () {
+      if (!confirm('¿Quitar el folio ' + b.dataset.del + ' de la lista? Sus cuestionarios capturados NO se borran.')) return;
+      var r = await api('eliminarParticipante', { proyecto: state.proy, folio: b.dataset.del });
+      if (!r.ok) { alert(r.error); return; } await recargarProyecto();
+    };
+  });
+}
+function normSexo(s) { s = String(s).toLowerCase(); if (/^(f|mujer|niña|femenino)/.test(s)) return 'Mujer'; if (/^(m|h|hombre|niño|var|masculino)/.test(s)) return 'Hombre'; return ''; }
+
+function modalParticipante(x) {
+  var ed = !!x; x = x || {};
+  var m = abrirModal('<div class="modal"><h2>' + (ed ? 'Editar folio ' + esc(x.folio) : 'Agregar niña o niño') + '</h2>' +
+    '<div class="row"><div><label>Folio *</label><input type="text" id="aFolio" value="' + esc(x.folio) + '"' + (ed ? ' disabled' : '') + '></div>' +
+    '<div><label>Edad</label><input type="number" id="aEdad" min="5" max="18" value="' + esc(x.edad) + '"></div>' +
+    '<div><label>Sexo</label><select id="aSexo"><option value="">—</option>' + MONS.SEXOS.map(function (s) { return '<option' + (x.sexo === s ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select></div></div>' +
+    '<label>Nombre (opcional)</label><input type="text" id="aNombre" value="' + esc(x.nombre) + '">' +
+    '<label>Notas</label><textarea id="aNotas">' + esc(x.notas) + '</textarea>' +
+    '<div id="aMsg"></div><div class="modal-actions"><button class="btn sec" data-x>Cancelar</button><button class="btn primary" id="aOk">Guardar</button></div></div>');
+  m.querySelector('[data-x]').onclick = function () { m.remove(); };
+  $('aOk').onclick = async function () {
+    var folio = $('aFolio').value.trim();
+    if (!folio) { $('aMsg').innerHTML = '<div class="msg error">El folio es obligatorio.</div>'; return; }
+    var fin = conSpinner(this);
+    var r = await api('guardarParticipante', { proyecto: state.proy, folio: folio, nuevo: !ed, nombre: $('aNombre').value, edad: $('aEdad').value, sexo: $('aSexo').value, notas: $('aNotas').value });
+    fin();
+    if (!r.ok) { $('aMsg').innerHTML = '<div class="msg error">' + esc(r.error) + '</div>'; return; }
+    m.remove(); await recargarProyecto();
+  };
+}
+
+/* ======================= BARRA COMÚN DE INSTRUMENTO ======================= */
+function barraInstrumento(inst, opcionesExtra) {
+  return '<div class="toolbar between" style="margin-top:6px">' +
+    '<div class="toolbar" style="margin:0"><button class="btn verde" id="btnCapturar">+ Capturar cuestionario</button>' +
+      '<select id="fMomento" style="width:auto"><option value="">Base y final</option><option' + (state.fMomento === 'Base' ? ' selected' : '') + '>Base</option><option' + (state.fMomento === 'Final' ? ' selected' : '') + '>Final</option></select></div>' +
+    '<div class="toolbar" style="margin:0"><button class="btn sec" id="btnValidar">Validar</button>' +
+      '<select id="selFormato" style="width:auto"><option value="xlsx">Excel (.xlsx)</option><option value="csv">CSV</option><option value="pdf">Informe PDF</option>' + (opcionesExtra || '') + '</select>' +
+      '<button class="btn primary" id="btnDescargar">Generar descargable</button></div>' +
+  '</div><div id="valBox"></div>';
+}
+function conectarBarra(inst, capturar) {
+  $('btnCapturar').onclick = function () { capturar(null); };
+  $('fMomento').onchange = function () { state.fMomento = this.value; renderProyecto(); };
+  $('btnValidar').onclick = function () { mostrarValidacion(inst); };
+  $('btnDescargar').onclick = function () {
+    var f = $('selFormato').value;
+    var v = validar(inst);
+    if (v.errores.length) { mostrarValidacion(inst); return; }
+    descargar(inst, f);
+  };
+}
+function filtrarMomento(lista) { return state.fMomento ? lista.filter(function (x) { return x.momento === state.fMomento; }) : lista; }
+
+/* ======================= SDQ ======================= */
+function subSDQ() {
+  var d = state.datos, box = $('subContent');
+  var lista = filtrarMomento(d.sdq).slice().sort(function (a, b) { return cmpFolio(a.folio, b.folio) || a.momento.localeCompare(b.momento); });
+  var celda = function (x, k) { var v = x.cal.escalas[k]; return '<td class="num">' + chipBanda(x.cal.bandas[k], v === null ? 'inc.' : v) + '</td>'; };
+  var filas = lista.map(function (x) {
+    return '<tr><td><strong>' + esc(x.folio) + '</strong></td><td>' + esc(x.momento) + '</td><td>' + esc(x.fecha || '—') + '</td>' +
+      celda(x, 'EMO') + celda(x, 'CON') + celda(x, 'HIP') + celda(x, 'COM') + celda(x, 'DIF') + celda(x, 'PRO') +
+      '<td>' + (x.cal.faltantes.length ? '<span class="chip warn">' + x.cal.faltantes.length + ' sin resp.</span>' : '') + (x.origen === 'Enlace' ? ' <span class="chip info">enlace</span>' : '') + '</td>' +
+      '<td class="acc"><button class="btn sec s" data-ed="' + esc(x.folio) + '|' + esc(x.momento) + '">Editar</button> <button class="btn peligro s" data-del="' + esc(x.folio) + '|' + esc(x.momento) + '">Eliminar</button></td></tr>';
+  }).join('');
+  box.innerHTML =
+    '<h2>SDQ — Cuestionario de capacidades y dificultades</h2>' +
+    '<p class="subtle">25 afirmaciones, respuestas <em>No es verdad · Es verdad a medias · Verdaderamente sí</em>, sobre los últimos seis meses. La plataforma califica igual que la hoja del Anexo 17: cinco escalas (0-10), total de dificultades (0-40) y rangos Normal / Límite / Anormal.</p>' +
+    barraInstrumento('sdq') +
+    '<div class="leyenda"><span><i style="background:var(--verde)"></i>Normal</span><span><i style="background:#F4C95D"></i>Límite</span><span><i style="background:var(--rosa)"></i>Anormal</span><span class="muted">En Prosocial un puntaje alto es favorable.</span></div>' +
+    (lista.length ? '<div class="tabla-wrap"><table><thead><tr><th>Folio</th><th>Momento</th><th>Fecha</th><th class="num">Emocional</th><th class="num">Conducta</th><th class="num">Hiperact.</th><th class="num">Compañeros</th><th class="num">Dificultades</th><th class="num">Prosocial</th><th></th><th></th></tr></thead><tbody>' + filas + '</tbody></table></div>'
+      : '<div class="msg info">Aún no hay SDQ capturados' + (state.fMomento ? ' en momento ' + state.fMomento : '') + '. Usa "+ Capturar cuestionario" para transcribir uno aplicado en papel, o genera un enlace para que el grupo conteste en tableta.</div>');
+  conectarBarra('sdq', modalSDQ);
+  box.querySelectorAll('[data-ed]').forEach(function (b) { b.onclick = function () { var k = b.dataset.ed.split('|'); modalSDQ(d.sdq.filter(function (x) { return x.folio === k[0] && x.momento === k[1]; })[0]); }; });
+  box.querySelectorAll('[data-del]').forEach(function (b) { b.onclick = function () { eliminarCuestionario('eliminarSDQ', b.dataset.del); }; });
+}
+
+async function eliminarCuestionario(accion, clave) {
+  var k = clave.split('|');
+  if (!confirm('¿Eliminar el cuestionario del folio ' + k[0] + ' (momento ' + k[1] + ')? No se puede deshacer.')) return;
+  var r = await api(accion, { proyecto: state.proy, folio: k[0], momento: k[1] });
+  if (!r.ok) { alert(r.error); return; }
+  await recargarProyecto();
+}
+
+function encabezadoCaptura(x, prefijo) {
+  var d = state.datos;
+  var opsFolio = d.participantes.map(function (p) { return '<option value="' + esc(p.folio) + '">' + esc(p.folio) + (p.nombre ? ' — ' + esc(p.nombre) : '') + '</option>'; }).join('');
+  return '<div class="row">' +
+    '<div><label>Folio *</label><input type="text" id="' + prefijo + 'Folio" list="' + prefijo + 'Folios" value="' + esc(x.folio) + '"' + (x.folio ? ' disabled' : '') + ' placeholder="ej. 01"><datalist id="' + prefijo + 'Folios">' + opsFolio + '</datalist></div>' +
+    '<div><label>Momento *</label><select id="' + prefijo + 'Momento"' + (x.folio ? ' disabled' : '') + '>' + MONS.MOMENTOS.map(function (m) { return '<option' + ((x.momento || state.fMomento || 'Base') === m ? ' selected' : '') + '>' + m + '</option>'; }).join('') + '</select></div>' +
+    '<div><label>Fecha de aplicación</label><input type="date" id="' + prefijo + 'Fecha" value="' + esc(x.fecha || hoy()) + '"></div>' +
+    '</div><div class="row">' +
+    '<div><label>Edad</label><input type="number" id="' + prefijo + 'Edad" min="5" max="18" value="' + esc(x.edad) + '"></div>' +
+    '<div><label>Sexo</label><select id="' + prefijo + 'Sexo"><option value="">—</option>' + MONS.SEXOS.map(function (s) { return '<option' + (x.sexo === s ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select></div>' +
+    '<div><label>Aplicador(a)</label><input type="text" id="' + prefijo + 'Aplic" value="' + esc(x.aplicador || session.nombre) + '"></div></div>';
+}
+function autollenarDeLista(prefijo) {
+  var inp = $(prefijo + 'Folio');
+  inp.addEventListener('change', function () {
+    var p = state.datos.participantes.filter(function (x) { return x.folio === inp.value.trim(); })[0];
+    if (p) { if (p.edad && !$(prefijo + 'Edad').value) $(prefijo + 'Edad').value = p.edad; if (p.sexo && !$(prefijo + 'Sexo').value) $(prefijo + 'Sexo').value = p.sexo; }
+  });
+}
+
+function modalSDQ(x) {
+  var ed = !!x; x = x || { respuestas: {} };
+  var R = x.respuestas || {};
+  var filas = MONS.SDQ_ITEMS.map(function (it) {
+    return '<tr data-item="' + it.n + '"><td><strong>' + it.n + '.</strong> ' + esc(it.t) + (it.inv ? ' <span class="inv">(se puntúa invertido)</span>' : '') + '</td>' +
+      MONS.SDQ_OPCIONES.map(function (o) { return '<td class="opt"><input type="radio" name="sdq' + it.n + '" value="' + o.v + '" aria-label="' + esc(o.t) + '"' + (String(R[it.n]) === o.v ? ' checked' : '') + '></td>'; }).join('') + '</tr>';
+  }).join('');
+  var m = abrirModal('<div class="modal wide">' +
+    '<h2>' + (ed ? 'Editar SDQ · folio ' + esc(x.folio) + ' (' + esc(x.momento) + ')' : 'Capturar SDQ') + '</h2>' +
+    encabezadoCaptura(x, 's') +
+    '<div class="quick"><label style="margin-top:0">Captura rápida (opcional)</label><input type="text" id="sQuick" maxlength="25" placeholder="25 caracteres: 0 = No es verdad · 1 = A medias · 2 = Verdaderamente sí · x = no respondió">' +
+    '<div class="muted" style="margin-top:4px">Escribe las respuestas en orden tal como están marcadas en papel (sin invertir); se llenan los botones de abajo.</div></div>' +
+    '<div class="preview" id="sPrev"></div>' +
+    '<table class="q-grid"><thead><tr><th>Afirmación</th>' + MONS.SDQ_OPCIONES.map(function (o) { return '<th><span class="full">' + o.t + '</span><span class="corto">' + ({ '0': 'No', '1': 'Medias', '2': 'Sí', 'NR': 'N/R' })[o.v] + '</span></th>'; }).join('') + '</tr></thead><tbody>' + filas + '</tbody></table>' +
+    '<label>Observaciones (p. ej. marcó más de una respuesta en algún ítem)</label><textarea id="sObs">' + esc(x.observaciones) + '</textarea>' +
+    '<div id="sMsg"></div>' +
+    '<div class="modal-actions"><button class="btn sec" data-x>Cancelar</button><button class="btn primary" id="sOk">Guardar</button></div></div>');
+  m.querySelector('[data-x]').onclick = function () { m.remove(); };
+  if (!ed) autollenarDeLista('s');
+  var leer = function () { var r = {}; MONS.SDQ_ITEMS.forEach(function (it) { var c = m.querySelector('input[name=sdq' + it.n + ']:checked'); r[it.n] = c ? c.value : ''; }); return r; };
+  var prev = function () {
+    var c = MONS.calificarSDQ(leer());
+    var sinMarcar = MONS.SDQ_ITEMS.filter(function (it) { return !m.querySelector('input[name=sdq' + it.n + ']:checked'); }).length;
+    $('sPrev').innerHTML = '<strong style="margin-right:4px">Vista previa:</strong>' + MONS.SDQ_ESCALAS.concat([MONS.SDQ_DIFICULTADES]).map(function (e) { var v = c.escalas[e.clave]; return '<span>' + e.nombre.split(' (')[0] + ' ' + chipBanda(c.bandas[e.clave], v === null ? '—' : v) + '</span>'; }).join(' ') +
+      (sinMarcar ? ' <span class="chip warn">' + sinMarcar + ' sin marcar</span>' : ' <span class="chip ok">25/25</span>');
+  };
+  m.querySelectorAll('input[type=radio]').forEach(function (r) { r.addEventListener('change', function () { r.closest('tr').classList.remove('falta'); prev(); }); });
+  $('sQuick').addEventListener('input', function () {
+    var s = this.value.toLowerCase().replace(/\s/g, '');
+    s.split('').forEach(function (ch, i) { if (i >= 25) return; var v = ch === 'x' || ch === 'n' ? 'NR' : ch; var inp = m.querySelector('input[name=sdq' + (i + 1) + '][value="' + v + '"]'); if (inp) inp.checked = true; });
+    prev();
+  });
+  prev();
+  $('sOk').onclick = async function () {
+    var folio = $('sFolio').value.trim(), r = leer();
+    var faltan = MONS.SDQ_ITEMS.filter(function (it) { return !r[it.n]; });
+    m.querySelectorAll('tr[data-item]').forEach(function (tr) { tr.classList.toggle('falta', !r[tr.dataset.item]); });
+    if (!folio) { $('sMsg').innerHTML = '<div class="msg error">Escribe el folio.</div>'; return; }
+    if (faltan.length) { $('sMsg').innerHTML = '<div class="msg error">Faltan ' + faltan.length + ' afirmación(es) por marcar (resaltadas en rosa). Si en papel no hay respuesta, marca "No respondió".</div>'; return; }
+    var fin = conSpinner(this);
+    var res = await api('guardarSDQ', { proyecto: state.proy, folio: folio, momento: $('sMomento').value, nuevo: !ed, fecha: $('sFecha').value, edad: $('sEdad').value, sexo: $('sSexo').value, aplicador: $('sAplic').value, observaciones: $('sObs').value, respuestas: JSON.stringify(r) });
+    fin();
+    if (!res.ok) { $('sMsg').innerHTML = '<div class="msg error">' + esc(res.error) + '</div>'; return; }
+    m.remove(); toast('SDQ del folio ' + folio + ' guardado.'); await recargarProyecto();
+  };
+}
+
+/* ======================= ERI ======================= */
+function subERI() {
+  var d = state.datos, box = $('subContent');
+  var lista = filtrarMomento(d.eri).slice().sort(function (a, b) { return cmpFolio(a.folio, b.folio) || a.momento.localeCompare(b.momento); });
+  var max = MONS.maxTotalERI();
+  var filas = lista.map(function (x) {
+    var c = x.cal;
+    return '<tr><td><strong>' + esc(x.folio) + '</strong></td><td>' + esc(x.momento) + '</td><td>' + esc(x.fecha || '—') + '</td>' +
+      '<td class="num">' + chipBanda(c.bandaTotal, c.total + ' / ' + max) + '</td><td class="num">' + c.significativos + '</td><td class="num">' + c.criticosMedio + '</td><td class="num">' + c.criticosAlto + '</td>' +
+      '<td>' + chipBanda(c.riesgoGlobal) + '</td>' +
+      '<td>' + (c.alertaItems.length ? '<span class="chip alto" title="Respuesta afirmativa en ítem(s) de autolesión">⚑ Atención</span> ' : '') + (c.faltantes.length ? '<span class="chip warn">' + c.faltantes.length + ' sin resp.</span>' : '') + (x.origen === 'Enlace' ? ' <span class="chip info">enlace</span>' : '') + '</td>' +
+      '<td class="acc"><button class="btn sec s" data-ed="' + esc(x.folio) + '|' + esc(x.momento) + '">Editar</button> <button class="btn peligro s" data-del="' + esc(x.folio) + '|' + esc(x.momento) + '">Eliminar</button></td></tr>';
+  }).join('');
+  box.innerHTML =
+    '<h2>ERI — Cuestionario Inicial Primaria (evaluación de riesgo)</h2>' +
+    '<p class="subtle">26 preguntas de opción múltiple. Se califica igual que la hoja DHARTE del Anexo 18: puntuación total ponderada (bajo 0-14 · medio 15-38 · alto 39+), factores <strong>significativos</strong> (ítems 4, 5, 12, 13, 14, 16), factores <strong>críticos</strong> (ítems 17-22) y <strong>nivel de riesgo global</strong>.</p>' +
+    barraInstrumento('eri') +
+    '<div class="msg warn" style="margin-top:0"><strong>Ítems 21 y 22 (pensamientos de autolesión o de un plan para morir):</strong> cualquier respuesta afirmativa abre automáticamente una alerta en la pestaña "Alertas" para dar seguimiento según el protocolo de Monstritos. No esperes al análisis del grupo para atenderla.</div>' +
+    (lista.length ? '<div class="tabla-wrap"><table><thead><tr><th>Folio</th><th>Momento</th><th>Fecha</th><th class="num">Puntuación total</th><th class="num">Signif.</th><th class="num">Críticos medio</th><th class="num">Críticos alto</th><th>Riesgo global</th><th></th><th></th></tr></thead><tbody>' + filas + '</tbody></table></div>'
+      : '<div class="msg info">Aún no hay ERI capturados' + (state.fMomento ? ' en momento ' + state.fMomento : '') + '.</div>');
+  conectarBarra('eri', modalERI);
+  box.querySelectorAll('[data-ed]').forEach(function (b) { b.onclick = function () { var k = b.dataset.ed.split('|'); modalERI(d.eri.filter(function (x) { return x.folio === k[0] && x.momento === k[1]; })[0]); }; });
+  box.querySelectorAll('[data-del]').forEach(function (b) { b.onclick = function () { eliminarCuestionario('eliminarERI', b.dataset.del); }; });
+}
+
+function htmlPreguntaERI(it, R, prefijo) {
+  var sel = String(R[it.n] || '').split(',');
+  var tipo = it.multiple ? 'checkbox' : 'radio';
+  var ops = it.op.map(function (o) {
+    return '<label><input type="' + tipo + '" name="' + prefijo + it.n + '" value="' + o[0] + '"' + (sel.indexOf(o[0]) > -1 ? ' checked' : '') + '> ' + o[0] + ') ' + esc(o[1]) + '</label>';
+  }).join('');
+  if (!it.multiple && prefijo === 'e') ops += '<label style="border-style:dashed"><input type="radio" name="' + prefijo + it.n + '" value="NR"' + (R[it.n] === 'NR' ? ' checked' : '') + '> No respondió</label>';
+  var extra = (it.abiertas || []).map(function (a) {
+    return '<div data-si="' + a.si.join(',') + '"><label style="margin-top:4px">' + esc(a.t) + '</label><input type="text" id="' + prefijo + 'x_' + a.clave + '" value="' + esc(R[a.clave]) + '"></div>';
+  }).join('');
+  return '<div class="preg" data-n="' + it.n + '"><div class="enun">' + it.n + '. ' + esc(it.t) + '</div><div class="ops">' + ops + '</div>' + (extra ? '<div class="extra">' + extra + '</div>' : '') + '</div>';
+}
+function htmlCuestionarioERI(R, prefijo) {
+  return MONS.ERI_ITEMS.map(function (it) {
+    var sec = MONS.ERI_SECCIONES.filter(function (s) { return s.desde === it.n; })[0];
+    return (sec ? '<div class="seccion-nota">' + esc(sec.texto) + '</div>' : '') + htmlPreguntaERI(it, R, prefijo);
+  }).join('');
+}
+function leerERI(cont, prefijo) {
+  var r = {};
+  MONS.ERI_ITEMS.forEach(function (it) {
+    var marcados = Array.prototype.map.call(cont.querySelectorAll('input[name=' + prefijo + it.n + ']:checked'), function (i) { return i.value; });
+    r[it.n] = marcados.join(',');
+    (it.abiertas || []).forEach(function (a) { var inp = cont.querySelector('#' + prefijo + 'x_' + a.clave); if (inp && inp.value.trim()) r[a.clave] = inp.value.trim(); });
+  });
+  return r;
+}
+function actualizarVisibilidadERI(cont, prefijo) {
+  cont.querySelectorAll('.preg').forEach(function (pq) {
+    var n = pq.dataset.n;
+    var marcados = Array.prototype.map.call(pq.querySelectorAll('input:checked'), function (i) { return i.value; });
+    pq.querySelectorAll('[data-si]').forEach(function (ex) { var si = ex.dataset.si.split(','); ex.style.display = marcados.some(function (v) { return si.indexOf(v) > -1; }) ? '' : 'none'; });
+    var it = MONS.ERI_ITEMS[n - 1];
+    if (prefijo === 'e') pq.classList.toggle('alerta-on', !!it.alerta && (marcados.indexOf('a') > -1 || marcados.indexOf('b') > -1));
+  });
+}
+
+function modalERI(x) {
+  var ed = !!x; x = x || { respuestas: {} };
+  var R = x.respuestas || {};
+  var m = abrirModal('<div class="modal wide">' +
+    '<h2>' + (ed ? 'Editar ERI · folio ' + esc(x.folio) + ' (' + esc(x.momento) + ')' : 'Capturar ERI — Cuestionario Inicial Primaria') + '</h2>' +
+    encabezadoCaptura(x, 'e') +
+    '<div class="quick"><label style="margin-top:0">Captura rápida (opcional)</label><input type="text" id="eQuick" maxlength="26" placeholder="26 letras en orden, p. ej. abaabccbac…  (x = no respondió)">' +
+    '<div class="muted" style="margin-top:4px">Igual que la hoja "Ingresar Datos": una letra por pregunta. En la 20 puedes marcar varias casillas después.</div></div>' +
+    '<div class="preview" id="ePrev"></div>' +
+    '<div id="eCuest">' + htmlCuestionarioERI(R, 'e') + '</div>' +
+    '<label>Observaciones (p. ej. marcó más de una respuesta)</label><textarea id="eObs">' + esc(x.observaciones) + '</textarea>' +
+    '<div id="eMsg"></div>' +
+    '<div class="modal-actions"><button class="btn sec" data-x>Cancelar</button><button class="btn primary" id="eOk">Guardar</button></div></div>');
+  m.querySelector('[data-x]').onclick = function () { m.remove(); };
+  if (!ed) autollenarDeLista('e');
+  var cont = $('eCuest');
+  var prev = function () {
+    actualizarVisibilidadERI(cont, 'e');
+    var c = MONS.calificarERI(leerERI(cont, 'e'));
+    var sinMarcar = MONS.ERI_ITEMS.filter(function (it) { return !cont.querySelector('input[name=e' + it.n + ']:checked'); }).length;
+    $('ePrev').innerHTML = '<strong>Vista previa:</strong> Total ' + chipBanda(c.bandaTotal, c.total) + ' Significativos <strong>' + c.significativos + '</strong> · Críticos medio <strong>' + c.criticosMedio + '</strong> · alto <strong>' + c.criticosAlto + '</strong> · Riesgo global ' + chipBanda(c.riesgoGlobal) +
+      (c.alertaItems.length ? ' <span class="chip alto">⚑ Se abrirá una alerta</span>' : '') + (sinMarcar ? ' <span class="chip warn">' + sinMarcar + ' sin marcar</span>' : ' <span class="chip ok">26/26</span>');
+  };
+  cont.addEventListener('change', function (e) { var pq = e.target.closest('.preg'); if (pq) pq.classList.remove('falta'); prev(); });
+  $('eQuick').addEventListener('input', function () {
+    var s = this.value.toLowerCase().replace(/[^a-fx]/g, '');
+    s.split('').forEach(function (ch, i) {
+      if (i >= 26) return; var n = i + 1;
+      cont.querySelectorAll('input[name=e' + n + ']').forEach(function (inp) { inp.checked = false; });
+      var inp = cont.querySelector('input[name=e' + n + '][value="' + (ch === 'x' ? 'NR' : ch) + '"]'); if (inp) inp.checked = true;
+    });
+    prev();
+  });
+  prev();
+  $('eOk').onclick = async function () {
+    var folio = $('eFolio').value.trim(), r = leerERI(cont, 'e');
+    var faltan = MONS.ERI_ITEMS.filter(function (it) { return !r[it.n]; });
+    cont.querySelectorAll('.preg').forEach(function (pq) { pq.classList.toggle('falta', !r[pq.dataset.n]); });
+    if (!folio) { $('eMsg').innerHTML = '<div class="msg error">Escribe el folio.</div>'; return; }
+    if (faltan.length) { $('eMsg').innerHTML = '<div class="msg error">Faltan ' + faltan.length + ' pregunta(s): ' + faltan.map(function (i) { return i.n; }).join(', ') + '. Si en papel no hay respuesta, marca "No respondió".</div>'; return; }
+    var fin = conSpinner(this);
+    var res = await api('guardarERI', { proyecto: state.proy, folio: folio, momento: $('eMomento').value, nuevo: !ed, fecha: $('eFecha').value, edad: $('eEdad').value, sexo: $('eSexo').value, aplicador: $('eAplic').value, observaciones: $('eObs').value, respuestas: JSON.stringify(r) });
+    fin();
+    if (!res.ok) { $('eMsg').innerHTML = '<div class="msg error">' + esc(res.error) + '</div>'; return; }
+    var c = MONS.calificarERI(r);
+    m.remove();
+    toast(c.alertaItems.length ? 'ERI guardado. Se registró una alerta para el folio ' + folio + '.' : 'ERI del folio ' + folio + ' guardado.', c.alertaItems.length ? 'warn' : 'ok');
+    api('listarAlertas').then(function (ra) { if (ra.ok) state.alertas = ra.data; });
+    await recargarProyecto();
+  };
+}
+
+/* ======================= VALIDACIÓN ======================= */
+function validar(inst) {
+  var d = state.datos, errores = [], avisos = [];
+  if (inst === 'sdq' || inst === 'eri') {
+    var lista = filtrarMomento(d[inst]);
+    if (!lista.length) errores.push('No hay cuestionarios capturados' + (state.fMomento ? ' en momento ' + state.fMomento : '') + ' para generar el descargable.');
+    lista.forEach(function (x) {
+      if (x.cal.faltantes.length) avisos.push('Folio ' + x.folio + ' (' + x.momento + '): ' + x.cal.faltantes.length + ' respuesta(s) sin contestar — ítems ' + x.cal.faltantes.join(', ') + '.');
+      if (!x.edad || !x.sexo) avisos.push('Folio ' + x.folio + ' (' + x.momento + '): falta edad o sexo.');
+      if (inst === 'sdq') {
+        ['EMO', 'CON', 'HIP', 'COM', 'PRO'].forEach(function (k) { if (x.cal.escalas[k] === null) avisos.push('Folio ' + x.folio + ': la escala ' + MONS.SDQ_ESCALAS.filter(function (e) { return e.clave === k; })[0].nombre + ' quedó incompleta (3 o más ítems sin respuesta) y no se puntúa.'); });
+      } else {
+        var r = x.respuestas;
+        if (r['19'] === 'a' && r['20'] && r['20'] !== 'a') avisos.push('Folio ' + x.folio + ': en la 19 dice que no ha tenido relaciones pero en la 20 marcó un método. Revisa el papel.');
+        MONS.ERI_ITEMS.forEach(function (it) { (it.abiertas || []).forEach(function (a) { if (String(r[it.n] || '').split(',').some(function (v) { return a.si.indexOf(v) > -1; }) && !r[a.clave]) avisos.push('Folio ' + x.folio + ': pregunta ' + it.n + ' sin "' + a.t + '".'); }); });
+      }
+    });
+    var enLista = d.participantes.map(function (p) { return p.folio; });
+    var momentos = state.fMomento ? [state.fMomento] : ['Base'];
+    momentos.forEach(function (m) {
+      var sin = enLista.filter(function (f) { return !d[inst].some(function (x) { return x.folio === f && x.momento === m; }); });
+      if (sin.length && d[inst].some(function (x) { return x.momento === m; })) avisos.push(sin.length + ' folio(s) de la lista sin ' + inst.toUpperCase() + ' ' + m + ': ' + sin.slice(0, 15).join(', ') + (sin.length > 15 ? '…' : '') + '.');
+    });
+  }
+  return { errores: errores, avisos: avisos };
+}
+function mostrarValidacion(inst) {
+  var v = validar(inst), box = $('valBox');
+  if (!v.errores.length && !v.avisos.length) { box.innerHTML = '<div class="msg ok">Todo en orden: no hay errores ni advertencias.</div>'; return; }
+  box.innerHTML = (v.errores.length ? '<div class="msg error"><strong>Hay que corregir antes de descargar:</strong><ul>' + v.errores.map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul></div>' : '') +
+    (v.avisos.length ? '<div class="msg warn"><strong>Advertencias (puedes descargar de todos modos):</strong><ul>' + v.avisos.slice(0, 30).map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + (v.avisos.length > 30 ? '<li>… y ' + (v.avisos.length - 30) + ' más</li>' : '') + '</ul></div>' : '');
+}
+
+/* ======================= ANÁLISIS (cálculos) ======================= */
+function analizarSDQ(lista) {
+  var n = lista.length;
+  var items = MONS.SDQ_ITEMS.map(function (it) {
+    var c = [0, 0, 0], suma = 0, resp = 0;
+    lista.forEach(function (x) { var p = x.cal.items[it.n]; if (p !== null && p !== undefined) { c[p]++; suma += p; resp++; } });
+    return { it: it, c: c, suma: suma, prom: resp ? suma / resp : null, resp: resp };
+  });
+  var escalas = MONS.SDQ_ESCALAS.concat([MONS.SDQ_DIFICULTADES]).map(function (e) {
+    var b = { 'Normal': 0, 'Límite': 0, 'Anormal': 0 }, suma = 0, cnt = 0;
+    lista.forEach(function (x) { var v = x.cal.escalas[e.clave]; if (v !== null) { b[x.cal.bandas[e.clave]]++; suma += v; cnt++; } });
+    return { e: e, b: b, suma: suma, prom: cnt ? suma / cnt : null, n: cnt };
+  });
+  return { n: n, items: items, escalas: escalas };
+}
+function analizarERI(lista) {
+  var items = MONS.ERI_ITEMS.map(function (it) {
+    var c = [0, 0, 0], suma = 0, resp = 0;
+    lista.forEach(function (x) { var p = x.cal.items[it.n]; if (p !== null && p !== undefined) { c[p]++; suma += p; resp++; } });
+    return { it: it, c: c, suma: suma, prom: resp ? suma / resp : null, resp: resp };
+  });
+  var cats = MONS.ERI_CATEGORIAS.map(function (cat) {
+    var its = items.filter(function (i) { return i.it.cat === cat.clave; });
+    var c = [0, 0, 0], suma = 0, resp = 0;
+    its.forEach(function (i) { c[0] += i.c[0]; c[1] += i.c[1]; c[2] += i.c[2]; suma += i.suma; resp += i.resp; });
+    return { cat: cat, items: its, c: c, suma: suma, prom: resp ? suma / resp : null, resp: resp };
+  });
+  var tot = { BAJO: 0, MEDIO: 0, ALTO: 0 }, glob = { BAJO: 0, MEDIO: 0, ALTO: 0 }, suma = 0;
+  lista.forEach(function (x) { tot[x.cal.bandaTotal]++; glob[x.cal.riesgoGlobal]++; suma += x.cal.total; });
+  return { n: lista.length, items: items, cats: cats, tot: tot, glob: glob, prom: lista.length ? suma / lista.length : null, alertas: lista.filter(function (x) { return x.cal.alertaItems.length; }).length };
+}
+function barra(c, total, etiquetas) {
+  if (!total) return '<div class="barra"></div>';
+  return '<div class="barra">' + c.map(function (v, i) { var p = pct(v, total); return p ? '<span class="b' + i + '" style="width:' + p + '%" title="' + esc((etiquetas ? etiquetas[i] + ': ' : '') + v + ' (' + p + '%)') + '">' + (p >= 9 ? v : '') + '</span>' : ''; }).join('') + '</div>';
+}
+
+function comparativo() {
+  var d = state.datos;
+  var folios = {};
+  d.eri.concat(d.sdq).forEach(function (x) { folios[x.folio] = 1; });
+  return Object.keys(folios).sort(cmpFolio).map(function (f) {
+    var g = function (lista, m) { return lista.filter(function (x) { return x.folio === f && x.momento === m; })[0]; };
+    var eb = g(d.eri, 'Base'), ef = g(d.eri, 'Final'), sb = g(d.sdq, 'Base'), sf = g(d.sdq, 'Final');
+    var cambio = function (a, b) { return (a !== null && a !== undefined && b !== null && b !== undefined && a !== 0) ? (b - a) / a : null; };
+    return {
+      folio: f,
+      eriB: eb ? eb.cal.total : null, eriF: ef ? ef.cal.total : null, eriCambio: eb && ef ? cambio(eb.cal.total, ef.cal.total) : null,
+      globB: eb ? eb.cal.riesgoGlobal : '', globF: ef ? ef.cal.riesgoGlobal : '',
+      difB: sb ? sb.cal.escalas.DIF : null, difF: sf ? sf.cal.escalas.DIF : null, difCambio: sb && sf ? cambio(sb.cal.escalas.DIF, sf.cal.escalas.DIF) : null,
+      proB: sb ? sb.cal.escalas.PRO : null, proF: sf ? sf.cal.escalas.PRO : null
+    };
+  });
+}
+function fmtCambio(c, invertido) {
+  if (c === null) return '<span class="muted">—</span>';
+  var p = Math.round(c * 1000) / 10;
+  var mejora = invertido ? p > 0 : p < 0;
+  return '<span class="' + (p === 0 ? '' : mejora ? 'delta-baja' : 'delta-sube') + '">' + (p > 0 ? '+' : '') + p + '%</span>';
+}
+
+/* ======================= ANÁLISIS (vista) ======================= */
+function subAnalisis() {
+  var d = state.datos, box = $('subContent'), m = state.momentoAnalisis;
+  var sdq = d.sdq.filter(function (x) { return x.momento === m; }), eri = d.eri.filter(function (x) { return x.momento === m; });
+  var aS = analizarSDQ(sdq), aE = analizarERI(eri);
+  var etiqS = ['Normal', 'Límite', 'Anormal'];
+  var escalasHtml = aS.escalas.map(function (s) {
+    var c = [s.b['Normal'], s.b['Límite'], s.b['Anormal']];
+    return '<tr><td><strong>' + esc(s.e.nombre) + '</strong><div class="muted">N ' + s.e.normal.join('-') + ' · L ' + s.e.limite.join('-') + ' · A ' + s.e.anormal.join('-') + '</div></td><td style="min-width:200px">' + barra(c, s.n, etiqS) + '</td>' +
+      '<td class="num">' + c[0] + ' <span class="muted">(' + pct(c[0], s.n) + '%)</span></td><td class="num">' + c[1] + ' <span class="muted">(' + pct(c[1], s.n) + '%)</span></td><td class="num">' + c[2] + ' <span class="muted">(' + pct(c[2], s.n) + '%)</span></td><td class="num">' + fmt1(s.prom) + '</td></tr>';
+  }).join('');
+  var etiqE = ['Bajo', 'Medio', 'Alto'];
+  var catsHtml = aE.cats.map(function (cat) {
+    var prot = cat.cat.clave === 'PRO';
+    return '<tr style="background:#FAFCF9"><td colspan="6"><strong>' + esc(cat.cat.nombre) + '</strong>' + (prot ? ' <span class="muted">(0 = factor presente · 1 = ausente)</span>' : '') + '</td></tr>' +
+      cat.items.map(function (i) {
+        var c = prot ? [i.c[0], i.c[1], 0] : i.c;
+        return '<tr><td>' + i.it.n + '. ' + esc(i.it.t.replace('En los últimos 6 meses, ', '').replace(/^./, function (s) { return s.toUpperCase(); })) + '<div class="muted">' + esc(i.it.factor) + '</div></td><td style="min-width:180px">' + barra(c, i.resp, prot ? ['Presente', 'Ausente', ''] : etiqE) + '</td>' +
+          '<td class="num">' + c[0] + '</td><td class="num">' + c[1] + '</td><td class="num">' + (prot ? '—' : c[2]) + '</td><td class="num">' + fmt1(i.prom) + '</td></tr>';
+      }).join('');
+  }).join('');
+  var comp = comparativo();
+  var conAmbos = comp.filter(function (c) { return c.eriB !== null && c.eriF !== null; });
+  var promB = conAmbos.length ? conAmbos.reduce(function (s, c) { return s + c.eriB; }, 0) / conAmbos.length : null;
+  var promF = conAmbos.length ? conAmbos.reduce(function (s, c) { return s + c.eriF; }, 0) / conAmbos.length : null;
+  var compHtml = comp.map(function (c) {
+    return '<tr><td><strong>' + esc(c.folio) + '</strong></td><td class="num">' + (c.eriB === null ? '—' : c.eriB) + '</td><td class="num">' + (c.eriF === null ? '—' : c.eriF) + '</td><td class="num">' + fmtCambio(c.eriCambio) + '</td>' +
+      '<td>' + (c.globB ? chipBanda(c.globB) : '—') + ' → ' + (c.globF ? chipBanda(c.globF) : '—') + '</td>' +
+      '<td class="num">' + (c.difB === null ? '—' : c.difB) + '</td><td class="num">' + (c.difF === null ? '—' : c.difF) + '</td><td class="num">' + fmtCambio(c.difCambio) + '</td>' +
+      '<td class="num">' + (c.proB === null ? '—' : c.proB) + ' → ' + (c.proF === null ? '—' : c.proF) + '</td></tr>';
+  }).join('');
+
+  box.innerHTML =
+    '<div class="toolbar between"><div><h2 style="margin:0">Análisis del grupo</h2><p class="subtle" style="margin:4px 0 0">Equivale a las hojas "Analisis" (Anexo 17) y "Analisis riesgo" (Anexo 18). Úsalo para decidir en qué temas enfocar los talleres.</p></div>' +
+    '<div class="toolbar" style="margin:0"><span class="muted">Momento:</span>' + MONS.MOMENTOS.map(function (x) { return '<button class="btn s ' + (x === m ? 'primary' : 'sec') + '" data-mom="' + x + '">' + x + '</button>'; }).join('') +
+    '<button class="btn verde s" id="btnInforme">Informe PDF</button></div></div>' +
+    '<div class="grid2" style="margin-top:14px">' +
+      '<div class="tile"><h3>ERI · Riesgo global (' + esc(m) + ')</h3>' + (aE.n ? barra([aE.glob.BAJO, aE.glob.MEDIO, aE.glob.ALTO], aE.n, etiqE) +
+        '<div class="leyenda"><span><i style="background:var(--verde)"></i>Bajo ' + aE.glob.BAJO + ' (' + pct(aE.glob.BAJO, aE.n) + '%)</span><span><i style="background:#F4C95D"></i>Medio ' + aE.glob.MEDIO + ' (' + pct(aE.glob.MEDIO, aE.n) + '%)</span><span><i style="background:var(--rosa)"></i>Alto ' + aE.glob.ALTO + ' (' + pct(aE.glob.ALTO, aE.n) + '%)</span></div>' +
+        '<div class="muted">' + aE.n + ' cuestionarios · puntuación total promedio ' + fmt1(aE.prom) + ' / ' + MONS.maxTotalERI() + (aE.alertas ? ' · <strong style="color:var(--rosa-osc)">' + aE.alertas + ' con alerta de autolesión</strong>' : '') + '</div>' : '<p class="muted">Sin ERI en este momento.</p>') + '</div>' +
+      '<div class="tile"><h3>SDQ · Total de dificultades (' + esc(m) + ')</h3>' + (aS.n ? (function () { var s = aS.escalas[5]; var c = [s.b['Normal'], s.b['Límite'], s.b['Anormal']]; return barra(c, s.n, etiqS) + '<div class="leyenda"><span><i style="background:var(--verde)"></i>Normal ' + c[0] + ' (' + pct(c[0], s.n) + '%)</span><span><i style="background:#F4C95D"></i>Límite ' + c[1] + ' (' + pct(c[1], s.n) + '%)</span><span><i style="background:var(--rosa)"></i>Anormal ' + c[2] + ' (' + pct(c[2], s.n) + '%)</span></div><div class="muted">' + aS.n + ' cuestionarios · promedio ' + fmt1(s.prom) + ' / 40</div>'; })() : '<p class="muted">Sin SDQ en este momento.</p>') + '</div>' +
+    '</div>' +
+    '<h3>SDQ · Escalas</h3>' +
+    (aS.n ? '<div class="tabla-wrap"><table><thead><tr><th>Escala</th><th>Distribución</th><th class="num">Normal</th><th class="num">Límite</th><th class="num">Anormal</th><th class="num">Promedio</th></tr></thead><tbody>' + escalasHtml + '</tbody></table></div>' : '<p class="muted">Sin datos.</p>') +
+    '<h3>ERI · Factores de riesgo y protección por pregunta</h3>' +
+    '<div class="leyenda"><span><i style="background:var(--verde)"></i>Bajo (0) / factor presente</span><span><i style="background:#F4C95D"></i>Medio (1) / factor ausente</span><span><i style="background:var(--rosa)"></i>Alto (2)</span></div>' +
+    (aE.n ? '<div class="tabla-wrap"><table><thead><tr><th>Pregunta</th><th>Distribución</th><th class="num">Bajo</th><th class="num">Medio</th><th class="num">Alto</th><th class="num">Promedio</th></tr></thead><tbody>' + catsHtml + '</tbody></table></div>' : '<p class="muted">Sin datos.</p>') +
+    '<h3>Comparativo base → final (Ev. Riesgo)</h3>' +
+    '<p class="subtle">Cambio % = (final − base) / base, igual que la hoja "Ev. Riesgo". En ERI y dificultades SDQ, <span class="delta-baja">bajar es mejora</span>.' + (conAmbos.length ? ' Promedio ERI de quienes tienen ambos momentos: <strong>' + fmt1(promB) + ' → ' + fmt1(promF) + '</strong> (' + conAmbos.length + ' folios).' : '') + '</p>' +
+    (comp.length ? '<div class="tabla-wrap"><table><thead><tr><th>Folio</th><th class="num">ERI base</th><th class="num">ERI final</th><th class="num">Cambio</th><th>Riesgo global</th><th class="num">SDQ dif. base</th><th class="num">SDQ dif. final</th><th class="num">Cambio</th><th class="num">Prosocial</th></tr></thead><tbody>' + compHtml + '</tbody></table></div>' : '<p class="muted">Sin datos.</p>');
+  box.querySelectorAll('[data-mom]').forEach(function (b) { b.onclick = function () { state.momentoAnalisis = b.dataset.mom; subAnalisis(); }; });
+  $('btnInforme').onclick = function () { informePDF(m); };
+}
+
+/* ======================= FAMILIAS ======================= */
+function subFamilias() {
+  var d = state.datos, box = $('subContent');
+  var lista = d.familias.slice().sort(function (a, b) { return cmpFolio(a.folio, b.folio); });
+  var fam = function (f, i) { return f['f' + i + '_nombre'] ? esc(f['f' + i + '_nombre']) + ' <span class="muted">(' + esc(f['f' + i + '_relacion'] || '—') + ')</span>' : ''; };
+  box.innerHTML = '<div class="toolbar between"><div><h2 style="margin:0">Datos de familia</h2><p class="subtle" style="margin:4px 0 0">Hasta tres familiares o tutores por folio, con dirección y teléfono de contacto (hoja "Datos Familia" del Anexo 18). Información sensible: solo para seguimiento.</p></div>' +
+    '<div class="toolbar" style="margin:0"><button class="btn sec" id="btnFamXls">Descargar Excel</button><button class="btn verde" id="btnNuevaFam">+ Agregar</button></div></div>' +
+    (lista.length ? '<div class="tabla-wrap"><table><thead><tr><th>Folio</th><th>Familiar 1</th><th>Familiar 2</th><th>Familiar 3</th><th>Teléfono</th><th>Observaciones</th><th></th></tr></thead><tbody>' +
+      lista.map(function (f) { return '<tr><td><strong>' + esc(f.folio) + '</strong></td><td>' + fam(f, 1) + '</td><td>' + fam(f, 2) + '</td><td>' + fam(f, 3) + '</td><td>' + esc(f.telefono) + '</td><td>' + esc(f.observaciones) + '</td><td class="acc"><button class="btn sec s" data-ed="' + esc(f.folio) + '">Editar</button> <button class="btn peligro s" data-del="' + esc(f.folio) + '">Eliminar</button></td></tr>'; }).join('') +
+      '</tbody></table></div>' : '<div class="msg info">Sin datos de familia todavía.</div>');
+  $('btnNuevaFam').onclick = function () { modalFamilia(null); };
+  $('btnFamXls').onclick = function () { exportarFamilias(); };
+  box.querySelectorAll('[data-ed]').forEach(function (b) { b.onclick = function () { modalFamilia(d.familias.filter(function (f) { return f.folio === b.dataset.ed; })[0]); }; });
+  box.querySelectorAll('[data-del]').forEach(function (b) { b.onclick = async function () { if (!confirm('¿Eliminar los datos de familia del folio ' + b.dataset.del + '?')) return; var r = await api('eliminarFamilia', { proyecto: state.proy, folio: b.dataset.del }); if (!r.ok) { alert(r.error); return; } recargarProyecto(); }; });
+}
+function modalFamilia(f) {
+  var ed = !!f; f = f || {};
+  var rel = function (id, v) { return '<select id="' + id + '"><option value="">—</option>' + RELACIONES.map(function (r) { return '<option' + (v === r ? ' selected' : '') + '>' + r + '</option>'; }).join('') + '</select>'; };
+  var ops = state.datos.participantes.map(function (p) { return '<option value="' + esc(p.folio) + '">'; }).join('');
+  var m = abrirModal('<div class="modal"><h2>' + (ed ? 'Familia · folio ' + esc(f.folio) : 'Agregar datos de familia') + '</h2>' +
+    '<label>Folio *</label><input type="text" id="fFolio" list="fFolios" value="' + esc(f.folio) + '"' + (ed ? ' disabled' : '') + '><datalist id="fFolios">' + ops + '</datalist>' +
+    [1, 2, 3].map(function (i) { return '<div class="row"><div style="flex:2"><label>Familiar ' + i + ' · nombre(s) y apellidos</label><input type="text" id="fN' + i + '" value="' + esc(f['f' + i + '_nombre']) + '"></div><div><label>Relación</label>' + rel('fR' + i, f['f' + i + '_relacion']) + '</div></div>'; }).join('') +
+    '<label>Dirección</label><input type="text" id="fDir" value="' + esc(f.direccion) + '">' +
+    '<label>Teléfono de contacto</label><input type="text" id="fTel" value="' + esc(f.telefono) + '">' +
+    '<label>Observaciones</label><textarea id="fObs">' + esc(f.observaciones) + '</textarea>' +
+    '<div id="fMsg"></div><div class="modal-actions"><button class="btn sec" data-x>Cancelar</button><button class="btn primary" id="fOk">Guardar</button></div></div>');
+  m.querySelector('[data-x]').onclick = function () { m.remove(); };
+  $('fOk').onclick = async function () {
+    var folio = $('fFolio').value.trim(); if (!folio) { $('fMsg').innerHTML = '<div class="msg error">El folio es obligatorio.</div>'; return; }
+    var fin = conSpinner(this);
+    var r = await api('guardarFamilia', { proyecto: state.proy, folio: folio, f1_nombre: $('fN1').value, f1_relacion: $('fR1').value, f2_nombre: $('fN2').value, f2_relacion: $('fR2').value, f3_nombre: $('fN3').value, f3_relacion: $('fR3').value, direccion: $('fDir').value, telefono: $('fTel').value, observaciones: $('fObs').value });
+    fin(); if (!r.ok) { $('fMsg').innerHTML = '<div class="msg error">' + esc(r.error) + '</div>'; return; }
+    m.remove(); recargarProyecto();
+  };
+}
+
+/* ======================= VISITAS ======================= */
+function subVisitas() {
+  var d = state.datos, box = $('subContent');
+  var lista = d.visitas.slice().sort(function (a, b) { return String(b.fecha).localeCompare(String(a.fecha)); });
+  // resumen mensual por folio (como la hoja "Visitas Fam")
+  var meses = {}; lista.forEach(function (v) { if (v.fecha) meses[String(v.fecha).slice(0, 7)] = 1; });
+  var mesesOrd = Object.keys(meses).sort();
+  var folios = {}; lista.forEach(function (v) { folios[v.folio] = 1; });
+  var nomMes = function (ym) { var p = ym.split('-'); return ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][Number(p[1]) - 1] + ' ' + p[0].slice(2); };
+  var resumen = Object.keys(folios).sort(cmpFolio).map(function (f) {
+    var tot = 0;
+    return '<tr><td><strong>' + esc(f) + '</strong></td>' + mesesOrd.map(function (ym) { var n = lista.filter(function (v) { return v.folio === f && String(v.fecha).slice(0, 7) === ym; }).length; tot += n; return '<td class="num">' + (n || '') + '</td>'; }).join('') + '<td class="num"><strong>' + tot + '</strong></td></tr>';
+  }).join('');
+  box.innerHTML = '<div class="toolbar between"><div><h2 style="margin:0">Visitas familiares</h2><p class="subtle" style="margin:4px 0 0">Registra cada visita o contacto; el resumen por mes se arma solo (equivale a la hoja "Visitas Fam").</p></div>' +
+    '<div class="toolbar" style="margin:0"><button class="btn sec" id="btnVisXls">Descargar Excel</button><button class="btn verde" id="btnNuevaVis">+ Registrar visita</button></div></div>' +
+    (lista.length ? '<h3>Registro</h3><div class="tabla-wrap"><table><thead><tr><th>Fecha</th><th>Folio</th><th>Tipo</th><th>Responsable</th><th>Asistentes</th><th>Observaciones</th><th></th></tr></thead><tbody>' +
+      lista.map(function (v) { return '<tr><td>' + esc(v.fecha) + '</td><td><strong>' + esc(v.folio) + '</strong></td><td>' + esc(v.tipo) + '</td><td>' + esc(v.responsable) + '</td><td>' + esc(v.asistentes) + '</td><td>' + esc(v.observaciones) + '</td><td class="acc"><button class="btn sec s" data-ed="' + esc(v.id) + '">Editar</button> <button class="btn peligro s" data-del="' + esc(v.id) + '">Eliminar</button></td></tr>'; }).join('') +
+      '</tbody></table></div><h3>Resumen por mes</h3><div class="tabla-wrap"><table><thead><tr><th>Folio</th>' + mesesOrd.map(function (ym) { return '<th class="num">' + nomMes(ym) + '</th>'; }).join('') + '<th class="num">Total</th></tr></thead><tbody>' + resumen + '</tbody></table></div>'
+      : '<div class="msg info">Sin visitas registradas.</div>');
+  $('btnNuevaVis').onclick = function () { modalVisita(null); };
+  $('btnVisXls').onclick = function () { exportarVisitas(); };
+  box.querySelectorAll('[data-ed]').forEach(function (b) { b.onclick = function () { modalVisita(d.visitas.filter(function (v) { return v.id === b.dataset.ed; })[0]); }; });
+  box.querySelectorAll('[data-del]').forEach(function (b) { b.onclick = async function () { if (!confirm('¿Eliminar esta visita?')) return; var r = await api('eliminarVisita', { id: b.dataset.del }); if (!r.ok) { alert(r.error); return; } recargarProyecto(); }; });
+}
+function modalVisita(v) {
+  var ed = !!v; v = v || {};
+  var ops = state.datos.participantes.map(function (p) { return '<option value="' + esc(p.folio) + '">'; }).join('');
+  var m = abrirModal('<div class="modal"><h2>' + (ed ? 'Editar visita' : 'Registrar visita familiar') + '</h2>' +
+    '<div class="row"><div><label>Folio *</label><input type="text" id="vFolio" list="vFolios" value="' + esc(v.folio) + '"><datalist id="vFolios">' + ops + '</datalist></div>' +
+    '<div><label>Fecha *</label><input type="date" id="vFecha" value="' + esc(v.fecha || hoy()) + '"></div></div>' +
+    '<div class="row"><div><label>Tipo</label><select id="vTipo">' + TIPOS_VISITA.map(function (t) { return '<option' + (v.tipo === t ? ' selected' : '') + '>' + t + '</option>'; }).join('') + '</select></div>' +
+    '<div><label>Responsable</label><input type="text" id="vResp" value="' + esc(v.responsable || session.nombre) + '"></div></div>' +
+    '<label>¿Quiénes estuvieron?</label><input type="text" id="vAsis" value="' + esc(v.asistentes) + '" placeholder="ej. Madre y abuela">' +
+    '<label>Observaciones</label><textarea id="vObs">' + esc(v.observaciones) + '</textarea>' +
+    '<div id="vMsg"></div><div class="modal-actions"><button class="btn sec" data-x>Cancelar</button><button class="btn primary" id="vOk">Guardar</button></div></div>');
+  m.querySelector('[data-x]').onclick = function () { m.remove(); };
+  $('vOk').onclick = async function () {
+    if (!$('vFolio').value.trim() || !$('vFecha').value) { $('vMsg').innerHTML = '<div class="msg error">Folio y fecha son obligatorios.</div>'; return; }
+    var fin = conSpinner(this);
+    var r = await api('guardarVisita', { id: v.id || '', proyecto: state.proy, folio: $('vFolio').value.trim(), fecha: $('vFecha').value, tipo: $('vTipo').value, responsable: $('vResp').value, asistentes: $('vAsis').value, observaciones: $('vObs').value });
+    fin(); if (!r.ok) { $('vMsg').innerHTML = '<div class="msg error">' + esc(r.error) + '</div>'; return; }
+    m.remove(); recargarProyecto();
+  };
+}
+
+/* ======================= ENLACES ======================= */
+function urlAplicar(token) {
+  var base = location.href.split('#')[0].split('?')[0].replace(/index\.html$/, '');
+  if (!/\/$/.test(base)) base = base.replace(/[^\/]*$/, '');
+  return base + 'aplicar.html?t=' + token;
+}
+function subEnlaces() {
+  var d = state.datos, box = $('subContent');
+  var lista = d.enlaces.slice().sort(function (a, b) { return String(b.creado).localeCompare(String(a.creado)); });
+  box.innerHTML = '<h2>Enlaces de aplicación</h2>' +
+    '<p class="subtle">Genera un enlace para que las niñas y niños contesten el SDQ o el ERI en tableta, celular o computadora, <strong>siempre con un facilitador(a) presente</strong>, como en la aplicación en papel. Cada quien escribe su folio; si el grupo ya tiene lista, solo se aceptan folios de la lista, y cada folio contesta una sola vez por momento. Sus respuestas llegan directo a esta plataforma.</p>' +
+    '<div class="card pad-s" style="background:#FAFCF9"><div class="row" style="align-items:flex-end">' +
+      '<div><label>Cuestionario</label><select id="nlInst"><option value="SDQ">SDQ · Capacidades y dificultades</option><option value="ERI">ERI · Cuestionario Inicial</option></select></div>' +
+      '<div><label>Momento</label><select id="nlMom">' + MONS.MOMENTOS.map(function (m) { return '<option>' + m + '</option>'; }).join('') + '</select></div>' +
+      '<div><label>Vigencia (días)</label><input type="number" id="nlDias" value="7" min="1" max="60"></div>' +
+      '<div style="flex:0"><button class="btn primary" id="btnNuevoEnlace" style="white-space:nowrap">Generar enlace</button></div></div></div>' +
+    (lista.length ? lista.map(function (e) {
+      var vencido = new Date(e.expira).getTime() < Date.now();
+      return '<div class="card pad-s" style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">' +
+        '<div class="qr-box" data-qr="' + esc(urlAplicar(e.token)) + '"></div>' +
+        '<div style="flex:1;min-width:240px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><strong class="fredoka" style="font-size:17px">' + esc(e.instrumento) + ' · ' + esc(e.momento) + '</strong>' + (vencido ? '<span class="chip gris">Vencido</span>' : '<span class="chip ok">Activo</span>') + '<span class="muted">' + esc(e.usos || 0) + ' respuesta(s) recibidas · vence ' + esc(String(e.expira).slice(0, 10)) + '</span></div>' +
+        '<div class="enlace-url" style="margin:8px 0">' + esc(urlAplicar(e.token)) + '</div>' +
+        '<div class="toolbar" style="margin:0"><button class="btn sec s" data-copy="' + esc(urlAplicar(e.token)) + '">Copiar enlace</button><a class="btn sec s" style="text-decoration:none" target="_blank" rel="noopener" href="' + esc(urlAplicar(e.token)) + '">Abrir</a><button class="btn peligro s" data-rev="' + esc(e.token) + '">Desactivar</button></div></div></div>';
+    }).join('') : '<div class="msg info">No hay enlaces activos.</div>');
+  box.querySelectorAll('[data-qr]').forEach(function (q) { try { new QRCode(q, { text: q.dataset.qr, width: 120, height: 120, colorDark: '#141718', colorLight: '#ffffff' }); } catch (e) { q.remove(); } });
+  $('btnNuevoEnlace').onclick = async function () {
+    var fin = conSpinner(this, 'Generando…');
+    var r = await api('crearEnlace', { proyecto: state.proy, instrumento: $('nlInst').value, momento: $('nlMom').value, dias: $('nlDias').value });
+    fin(); if (!r.ok) { alert(r.error); return; } toast('Enlace creado.'); recargarProyecto();
+  };
+  box.querySelectorAll('[data-copy]').forEach(function (b) { b.onclick = function () { navigator.clipboard.writeText(b.dataset.copy).then(function () { toast('Enlace copiado.'); }); }; });
+  box.querySelectorAll('[data-rev]').forEach(function (b) { b.onclick = async function () { if (!confirm('¿Desactivar este enlace? Ya no se podrán enviar respuestas con él.')) return; var r = await api('revocarEnlace', { tokenEnlace: b.dataset.rev }); if (!r.ok) { alert(r.error); return; } recargarProyecto(); }; });
+}
+
+/* ======================= ALERTAS ======================= */
+async function renderAlertas() {
+  var main = $('main');
+  main.innerHTML = '<div class="cargando"><span class="spinner"></span> Cargando alertas…</div>';
+  var r = await api('listarAlertas');
+  if (!r.ok) { main.innerHTML = '<div class="msg error">' + esc(r.error) + '</div>'; return; }
+  state.alertas = r.data;
+  var f = state.filtroAlertas;
+  var lista = r.data.filter(function (a) { return f === 'todas' || a.estatus !== 'Atendida'; }).sort(function (a, b) { return String(b.fecha).localeCompare(String(a.fecha)); });
+  main.innerHTML = '<div class="card"><h1>Alertas que requieren atención</h1>' +
+    '<p class="subtle">Se abren solas cuando un ERI tiene respuesta afirmativa en la pregunta 21 (pensar en hacerse daño) o 22 (pensar en un plan para morir). Cada alerta debe atenderse de inmediato según el protocolo de canalización de Monstritos A.C., sin esperar al análisis del grupo. Registra aquí qué se hizo.</p>' +
+    '<div class="toolbar"><button class="btn s ' + (f === 'abiertas' ? 'primary' : 'sec') + '" data-f="abiertas">Abiertas</button><button class="btn s ' + (f === 'todas' ? 'primary' : 'sec') + '" data-f="todas">Todas</button></div>' +
+    (lista.length ? '<div class="tabla-wrap"><table><thead><tr><th>Fecha</th><th>Grupo</th><th>Folio</th><th>Motivo</th><th>Estatus</th><th>Seguimiento</th><th></th></tr></thead><tbody>' +
+      lista.map(function (a) {
+        return '<tr data-id="' + esc(a.id) + '"><td>' + esc(String(a.fecha).slice(0, 10)) + '</td><td>' + esc(a.escuela || a.proyecto) + '<div class="muted">' + esc(a.proyecto) + '</div></td><td><strong>' + esc(a.folio) + '</strong><div class="muted">' + esc(a.momento) + '</div></td>' +
+          '<td style="max-width:320px;font-size:13px">' + esc(a.motivo) + '</td>' +
+          '<td><select class="aEst" style="min-width:140px">' + ESTATUS_ALERTA.map(function (s) { return '<option' + (a.estatus === s ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select></td>' +
+          '<td style="min-width:220px"><textarea class="aNota" style="min-height:52px" placeholder="Qué se hizo, con quién, cuándo">' + esc(a.nota) + '</textarea><div class="muted">' + (a.responsable ? esc(a.responsable) + ' · ' + esc(a.actualizado) : '') + '</div></td>' +
+          '<td class="acc"><button class="btn primary s aOk">Guardar</button></td></tr>';
+      }).join('') + '</tbody></table></div>'
+      : '<div class="msg ok">No hay alertas ' + (f === 'abiertas' ? 'abiertas' : '') + '.</div>') + '</div>';
+  main.querySelectorAll('[data-f]').forEach(function (b) { b.onclick = function () { state.filtroAlertas = b.dataset.f; renderAlertas(); }; });
+  main.querySelectorAll('.aOk').forEach(function (b) {
+    b.onclick = async function () {
+      var tr = b.closest('tr'); var fin = conSpinner(b, '…');
+      var rr = await api('actualizarAlerta', { id: tr.dataset.id, estatus: tr.querySelector('.aEst').value, nota: tr.querySelector('.aNota').value });
+      fin(); if (!rr.ok) { alert(rr.error); return; } toast('Seguimiento guardado.'); renderApp();
+    };
+  });
+}
+
+/* ======================= INSTRUMENTOS (en blanco) ======================= */
+function renderInstrumentos() {
+  $('main').innerHTML = '<div class="card"><h1>Instrumentos</h1><p class="subtle">Descarga los formatos en blanco para aplicar en papel. Después se transcriben en el grupo correspondiente con "+ Capturar cuestionario".</p>' +
+    '<div class="grid2">' +
+      '<div class="tile" style="border-top:5px solid var(--azul)"><h3>SDQ · Cuestionario de capacidades y dificultades</h3><p class="subtle">Anexo 7 · 25 afirmaciones · autoaplicado · últimos 6 meses. Escalas: síntomas emocionales, problemas de conducta, hiperactividad, problemas con compañeros y conducta prosocial.</p><button class="btn primary" id="blSDQ">Imprimir en blanco</button></div>' +
+      '<div class="tile" style="border-top:5px solid var(--rosa)"><h3>ERI · Cuestionario Inicial Primaria</h3><p class="subtle">Anexo 8 · 26 preguntas de opción múltiple · proyecto Trasciende con Valor. Factores históricos, contextuales, individuales/clínicos y de protección.</p><button class="btn primary" id="blERI">Imprimir en blanco</button></div>' +
+      '<div class="tile" style="border-top:5px solid var(--verde)"><h3>Ficha de datos de familia</h3><p class="subtle">Tres familiares o tutores, dirección y teléfono. Para llenar en la visita o reunión con la familia.</p><button class="btn primary" id="blFAM">Imprimir en blanco</button></div>' +
+    '</div>' +
+    '<h3>Cómo se califica</h3><div class="tabla-wrap"><table><thead><tr><th>Instrumento</th><th>Regla</th></tr></thead><tbody>' +
+      '<tr><td><strong>SDQ</strong></td><td>No es verdad = 0 · A medias = 1 · Verdaderamente sí = 2; los ítems 7, 11, 14, 21 y 25 se invierten. Cada escala suma 5 ítems (0-10); dificultades = emocional + conducta + hiperactividad + compañeros (0-40). Si faltan 1-2 ítems de una escala se prorratea; con 3 o más queda incompleta.</td></tr>' +
+      '<tr><td><strong>ERI</strong></td><td>Cada pregunta vale 0, 1 o 2 según la opción (Anexo 18). Las preguntas 4, 5, 12-14 y 16-22 cuentan doble en el total (máx. ' + MONS.maxTotalERI() + '). Total: bajo 0-14, medio 15-38, alto 39+. <strong>Riesgo global:</strong> alto si total ≥ 39 o algún factor crítico (17-22) en 2; medio si total 15-38 o algún crítico en 1; bajo en otro caso. Protección (2, 3, 24, 25): 0 = presente, 1 = ausente.</td></tr>' +
+    '</tbody></table></div></div>';
+  $('blSDQ').onclick = function () { imprimirBlancoSDQ(); };
+  $('blERI').onclick = function () { imprimirBlancoERI(); };
+  $('blFAM').onclick = function () { imprimirBlancoFamilia(); };
+}
+
+/* ======================= USUARIOS ======================= */
+async function renderUsuarios() {
+  var main = $('main'); main.innerHTML = '<div class="cargando"><span class="spinner"></span></div>';
+  var r = await api('listarUsuarios'); if (!r.ok) { main.innerHTML = '<div class="msg error">' + esc(r.error) + '</div>'; return; }
+  main.innerHTML = '<div class="card"><div class="toolbar between"><div><h1>Usuarios</h1><p class="subtle" style="margin:0"><strong>Administrador</strong>: todo, incluyendo usuarios. <strong>Operativo</strong>: captura, análisis, enlaces y alertas.</p></div><button class="btn verde" id="btnNuevoU">+ Nuevo usuario</button></div>' +
+    '<div class="tabla-wrap"><table><thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estatus</th><th></th></tr></thead><tbody>' +
+    r.data.map(function (u) { return '<tr><td>' + esc(u.nombre) + '</td><td>' + esc(u.email) + '</td><td><span class="chip ' + (u.rol === 'Administrador' ? 'admin' : 'operativo') + '">' + esc(u.rol) + '</span></td><td>' + (u.estatus === 'Activo' ? '<span class="chip ok">Activo</span>' : '<span class="chip gris">Inactivo</span>') + '</td>' +
+      '<td class="acc"><button class="btn sec s" data-pw="' + esc(u.email) + '">Nueva contraseña</button> ' + (u.email === session.email ? '' : '<button class="btn sec s" data-est="' + esc(u.email) + '" data-v="' + (u.estatus === 'Activo' ? 'Inactivo' : 'Activo') + '">' + (u.estatus === 'Activo' ? 'Desactivar' : 'Activar') + '</button>') + '</td></tr>'; }).join('') +
+    '</tbody></table></div></div>';
+  $('btnNuevoU').onclick = function () {
+    var m = abrirModal('<div class="modal"><h2>Nuevo usuario</h2><label>Nombre</label><input type="text" id="uN"><label>Correo</label><input type="email" id="uE"><label>Rol</label><select id="uR"><option>Operativo</option><option>Administrador</option></select><label>Contraseña inicial</label><input type="text" id="uP" placeholder="mínimo 8 caracteres"><div id="uMsg"></div><div class="modal-actions"><button class="btn sec" data-x>Cancelar</button><button class="btn primary" id="uOk">Crear</button></div></div>');
+    m.querySelector('[data-x]').onclick = function () { m.remove(); };
+    $('uOk').onclick = async function () {
+      if ($('uP').value.length < 8) { $('uMsg').innerHTML = '<div class="msg error">La contraseña debe tener al menos 8 caracteres.</div>'; return; }
+      var fin = conSpinner(this);
+      var rr = await api('crearUsuario', { nombre: $('uN').value, email: $('uE').value, rol: $('uR').value, passHash: await sha256($('uP').value) });
+      fin(); if (!rr.ok) { $('uMsg').innerHTML = '<div class="msg error">' + esc(rr.error) + '</div>'; return; } m.remove(); renderUsuarios();
+    };
+  };
+  main.querySelectorAll('[data-est]').forEach(function (b) { b.onclick = async function () { var rr = await api('cambiarEstadoUsuario', { email: b.dataset.est, estatus: b.dataset.v }); if (!rr.ok) { alert(rr.error); return; } renderUsuarios(); }; });
+  main.querySelectorAll('[data-pw]').forEach(function (b) {
+    b.onclick = async function () {
+      var p = prompt('Nueva contraseña para ' + b.dataset.pw + ' (mínimo 8 caracteres):'); if (!p) return;
+      if (p.length < 8) { alert('Mínimo 8 caracteres.'); return; }
+      var rr = await api('restablecerPasswordUsuario', { email: b.dataset.pw, passHash: await sha256(p) }); if (!rr.ok) { alert(rr.error); return; } toast('Contraseña actualizada.');
+    };
+  });
+}
+
+function renderCuenta() {
+  $('main').innerHTML = '<div class="card" style="max-width:520px"><h1>Mi cuenta</h1><p class="subtle">' + esc(session.nombre) + ' · ' + esc(session.email) + '</p>' +
+    '<h3>Cambiar contraseña</h3><label>Contraseña actual</label><input type="password" id="cA"><label>Nueva contraseña</label><input type="password" id="cN" placeholder="mínimo 8 caracteres"><label>Repite la nueva</label><input type="password" id="cN2">' +
+    '<button class="btn primary" id="cOk" style="margin-top:16px">Guardar</button><div id="cMsg"></div></div>';
+  $('cOk').onclick = async function () {
+    if ($('cN').value.length < 8) { $('cMsg').innerHTML = '<div class="msg error">Mínimo 8 caracteres.</div>'; return; }
+    if ($('cN').value !== $('cN2').value) { $('cMsg').innerHTML = '<div class="msg error">Las contraseñas nuevas no coinciden.</div>'; return; }
+    var fin = conSpinner(this);
+    var r = await api('cambiarMiPassword', { passActualHash: await sha256($('cA').value), passNuevaHash: await sha256($('cN').value) });
+    fin(); $('cMsg').innerHTML = r.ok ? '<div class="msg ok">Contraseña actualizada.</div>' : '<div class="msg error">' + esc(r.error) + '</div>';
+  };
+}
+
+/* ======================= DESCARGAS ======================= */
+function nombreArchivo(base, ext) {
+  var p = state.datos.proyecto;
+  return (base + '_' + (p.escuela || p.codigo) + (p.grupo ? '_' + p.grupo : '') + (state.fMomento ? '_' + state.fMomento : '') + '.' + ext).replace(/[\\\/:*?"<>|°]/g, '').replace(/\s+/g, '_');
+}
+function hojaDeAOA(aoa, anchos) { var ws = XLSX.utils.aoa_to_sheet(aoa); if (anchos) ws['!cols'] = anchos.map(function (w) { return { wch: w }; }); return ws; }
+function descargarCSV(aoa, nombre) {
+  var csv = aoa.map(function (r) { return r.map(function (v) { v = v === null || v === undefined ? '' : String(v); return /[",\n;]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(','); }).join('\r\n');
+  var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
+}
+
+function tablasSDQ(lista) {
+  var opT = function (v) { var o = MONS.SDQ_OPCIONES.filter(function (x) { return x.v === String(v); })[0]; return o ? o.t : ''; };
+  var datos = [['Folio', 'Momento', 'Edad', 'Sexo', 'Fecha aplicación', 'Aplicador'].concat(MONS.SDQ_ITEMS.map(function (i) { return String(i.n); })).concat(['Observaciones', 'Origen'])];
+  var punt = [['Folio', 'Momento', 'Edad', 'Sexo', 'Fecha aplicación'].concat(MONS.SDQ_ITEMS.map(function (i) { return 'N' + i.n; })).concat(['TOTAL - Síntomas emocionales (de 10)', 'Banda', 'TOTAL - Problemas de conducta (de 10)', 'Banda', 'TOTAL - Hiperactividad (de 10)', 'Banda', 'TOTAL - Problemas con compañeros (de 10)', 'Banda', 'TOTAL - Dificultades (de 40)', 'Banda', 'TOTAL - Prosocial / capacidades (de 10)', 'Banda'])];
+  lista.forEach(function (x) {
+    datos.push([x.folio, x.momento, x.edad, x.sexo, x.fecha, x.aplicador].concat(MONS.SDQ_ITEMS.map(function (i) { return opT(x.respuestas[i.n]); })).concat([x.observaciones || '', x.origen || '']));
+    var c = x.cal;
+    punt.push([x.folio, x.momento, x.edad, x.sexo, x.fecha].concat(MONS.SDQ_ITEMS.map(function (i) { return c.items[i.n] === null ? '' : c.items[i.n]; }))
+      .concat(['EMO', 'CON', 'HIP', 'COM', 'DIF', 'PRO'].reduce(function (a, k) { return a.concat([c.escalas[k] === null ? '' : c.escalas[k], c.bandas[k]]); }, [])));
+  });
+  return { datos: datos, punt: punt };
+}
+function hojaAnalisisSDQ(lista) {
+  var a = analizarSDQ(lista), aoa = [['#', 'Pregunta', 'Escala', 'Participantes con 0', '%', 'Participantes con 1', '%', 'Participantes con 2', '%', 'Suma de puntuaciones', 'Promedio']];
+  MONS.SDQ_ESCALAS.forEach(function (e) {
+    a.items.filter(function (i) { return i.it.esc === e.clave; }).forEach(function (i, k) { aoa.push([i.it.n, i.it.t, k === 0 ? e.nombre.toUpperCase() : '', i.c[0], pct(i.c[0], i.resp) / 100, i.c[1], pct(i.c[1], i.resp) / 100, i.c[2], pct(i.c[2], i.resp) / 100, i.suma, i.prom === null ? '' : Math.round(i.prom * 100) / 100]); });
+    var s = a.escalas.filter(function (x) { return x.e.clave === e.clave; })[0];
+    aoa.push(['', '', '', 'Normal (' + e.normal.join('-') + ')', '%', 'Límite (' + e.limite.join('-') + ')', '%', 'Anormal (' + e.anormal.join('-') + ')', '%', 'Suma', 'Promedio']);
+    aoa.push(['TOTAL - ' + e.nombre.toUpperCase(), '', '', s.b['Normal'], pct(s.b['Normal'], s.n) / 100, s.b['Límite'], pct(s.b['Límite'], s.n) / 100, s.b['Anormal'], pct(s.b['Anormal'], s.n) / 100, s.suma, s.prom === null ? '' : Math.round(s.prom * 100) / 100]);
+    aoa.push([]);
+  });
+  var dd = a.escalas[5], e = MONS.SDQ_DIFICULTADES;
+  aoa.push(['', '', '', 'Normal (' + e.normal.join('-') + ')', '%', 'Límite (' + e.limite.join('-') + ')', '%', 'Anormal (' + e.anormal.join('-') + ')', '%', 'Suma', 'Promedio']);
+  aoa.push(['TOTAL - DIFICULTADES', '', '', dd.b['Normal'], pct(dd.b['Normal'], dd.n) / 100, dd.b['Límite'], pct(dd.b['Límite'], dd.n) / 100, dd.b['Anormal'], pct(dd.b['Anormal'], dd.n) / 100, dd.suma, dd.prom === null ? '' : Math.round(dd.prom * 100) / 100]);
+  aoa.push([]); aoa.push(['', '*En las escalas de dificultades, un puntaje mayor = MÁS dificultades. En la escala prosocial, un puntaje mayor = más capacidades.']);
+  return aoa;
+}
+function formatoPct(ws, cols) {
+  var rng = XLSX.utils.decode_range(ws['!ref']);
+  for (var r = 1; r <= rng.e.r; r++) cols.forEach(function (c) { var cell = ws[XLSX.utils.encode_cell({ r: r, c: c })]; if (cell && typeof cell.v === 'number') cell.z = '0.0%'; });
+}
+
+function tablasERI(lista) {
+  var abiertas = []; MONS.ERI_ITEMS.forEach(function (it) { (it.abiertas || []).forEach(function (a) { abiertas.push(a); }); });
+  var datos = [['Folio', 'Momento', 'Edad', 'Sexo', 'Fecha aplicación', 'Aplicador'].concat(MONS.ERI_ITEMS.map(function (i) { return String(i.n); })).concat(abiertas.map(function (a) { return a.clave.replace('_', ' - '); })).concat(['Observaciones', 'Origen'])];
+  var punt = [['Folio', 'Momento', 'Edad', 'Sexo', 'Fecha aplicación'].concat(MONS.ERI_ITEMS.map(function (i) { return 'N' + i.n; })).concat(['TOTAL', 'Banda total', 'Significativos', 'Críticos - Medio', 'Críticos - Alto', 'NIVEL DE RIESGO', 'Alerta autolesión'])];
+  lista.forEach(function (x) {
+    datos.push([x.folio, x.momento, x.edad, x.sexo, x.fecha, x.aplicador].concat(MONS.ERI_ITEMS.map(function (i) { return x.respuestas[i.n] === 'NR' ? 'no respondió' : (x.respuestas[i.n] || ''); })).concat(abiertas.map(function (a) { return x.respuestas[a.clave] || ''; })).concat([x.observaciones || '', x.origen || '']));
+    var c = x.cal;
+    punt.push([x.folio, x.momento, x.edad, x.sexo, x.fecha].concat(MONS.ERI_ITEMS.map(function (i) { return c.items[i.n] === null ? '' : c.items[i.n]; })).concat([c.total, c.bandaTotal, c.significativos, c.criticosMedio, c.criticosAlto, c.riesgoGlobal, c.alertaItems.length ? 'Sí' : '']));
+  });
+  return { datos: datos, punt: punt };
+}
+function hojaAnalisisERI(lista) {
+  var a = analizarERI(lista), aoa = [['#', 'Pregunta', 'Factor que mide', 'Tipo de factor', 'Bajo (0)', '%', 'Medio (1)', '%', 'Alto (2)', '%', 'Suma de puntuaciones', 'Promedio']];
+  a.cats.forEach(function (cat) {
+    var prot = cat.cat.clave === 'PRO';
+    if (prot) aoa.push(['', '', '', '', 'Presente (0)', '%', 'Ausente (1)', '%', '', '', 'Suma', 'Promedio']);
+    cat.items.forEach(function (i, k) { aoa.push([i.it.n, i.it.t, i.it.factor, k === 0 ? cat.cat.nombre.toUpperCase() : '', i.c[0], pct(i.c[0], i.resp) / 100, i.c[1], pct(i.c[1], i.resp) / 100, prot ? '' : i.c[2], prot ? '' : pct(i.c[2], i.resp) / 100, i.suma, i.prom === null ? '' : Math.round(i.prom * 100) / 100]); });
+    aoa.push(['TOTAL - ' + cat.cat.nombre.toUpperCase(), '', '', '', cat.c[0], pct(cat.c[0], cat.resp) / 100, cat.c[1], pct(cat.c[1], cat.resp) / 100, prot ? '' : cat.c[2], prot ? '' : pct(cat.c[2], cat.resp) / 100, cat.suma, cat.prom === null ? '' : Math.round(cat.prom * 100) / 100]);
+    aoa.push([]);
+  });
+  aoa.push(['', '', '', '', 'Bajo', '%', 'Medio', '%', 'Alto', '%', 'Suma', 'Promedio']);
+  var suma = lista.reduce(function (s, x) { return s + x.cal.total; }, 0);
+  aoa.push(['PUNTUACIÓN TOTAL:', '', '', '', a.tot.BAJO, pct(a.tot.BAJO, a.n) / 100, a.tot.MEDIO, pct(a.tot.MEDIO, a.n) / 100, a.tot.ALTO, pct(a.tot.ALTO, a.n) / 100, suma, a.n ? Math.round(suma / a.n * 100) / 100 : '']);
+  aoa.push(['RIESGO GLOBAL:', '', '', '', a.glob.BAJO, pct(a.glob.BAJO, a.n) / 100, a.glob.MEDIO, pct(a.glob.MEDIO, a.n) / 100, a.glob.ALTO, pct(a.glob.ALTO, a.n) / 100, 'N/A', 'N/A']);
+  return aoa;
+}
+function hojaEvRiesgo() {
+  var aoa = [['Folio', 'ERI base', 'ERI final', 'Cambio %', 'Riesgo global base', 'Riesgo global final', 'SDQ dificultades base', 'SDQ dificultades final', 'Cambio %', 'SDQ prosocial base', 'SDQ prosocial final']];
+  comparativo().forEach(function (c) { aoa.push([c.folio, c.eriB, c.eriF, c.eriCambio, c.globB, c.globF, c.difB, c.difF, c.difCambio, c.proB, c.proF]); });
+  return aoa;
+}
+
+function descargar(inst, formato) {
+  var d = state.datos, lista = filtrarMomento(d[inst]).slice().sort(function (a, b) { return cmpFolio(a.folio, b.folio); });
+  if (formato === 'pdf') { informePDF(state.fMomento || 'Base', inst); return; }
+  if (inst === 'sdq') {
+    var t = tablasSDQ(lista);
+    if (formato === 'csv') { descargarCSV(t.punt.map(function (r, i) { return i === 0 ? r : r; }), nombreArchivo('SDQ_puntuacion', 'csv')); return; }
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, hojaDeAOA(t.datos, [10, 9, 6, 8, 12, 18].concat(MONS.SDQ_ITEMS.map(function () { return 16; }))), 'Ingresar Datos');
+    XLSX.utils.book_append_sheet(wb, hojaDeAOA(t.punt, [10, 9, 6, 8, 12].concat(MONS.SDQ_ITEMS.map(function () { return 5; }))), 'Puntuacion');
+    var wsA = hojaDeAOA(hojaAnalisisSDQ(lista), [30, 60, 26, 12, 8, 12, 8, 12, 8, 12, 10]); formatoPct(wsA, [4, 6, 8]);
+    XLSX.utils.book_append_sheet(wb, wsA, 'Analisis');
+    XLSX.writeFile(wb, nombreArchivo('SDQ', 'xlsx'));
+  } else if (inst === 'eri') {
+    var e = tablasERI(lista);
+    if (formato === 'csv') { descargarCSV(e.punt, nombreArchivo('ERI_puntuacion', 'csv')); return; }
+    var wb2 = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb2, hojaDeAOA(e.datos, [10, 9, 6, 8, 12, 18]), 'Ingresar Datos');
+    XLSX.utils.book_append_sheet(wb2, hojaDeAOA(e.punt, [10, 9, 6, 8, 12]), 'Puntuacion');
+    var wsR = hojaDeAOA(hojaAnalisisERI(lista), [22, 60, 36, 34, 10, 8, 10, 8, 10, 8, 12, 10]); formatoPct(wsR, [5, 7, 9]);
+    XLSX.utils.book_append_sheet(wb2, wsR, 'Analisis riesgo');
+    var wsE = hojaDeAOA(hojaEvRiesgo(), [10, 10, 10, 10, 16, 16, 18, 18, 10, 16, 16]); formatoPct(wsE, [3, 8]);
+    XLSX.utils.book_append_sheet(wb2, wsE, 'Ev. Riesgo');
+    XLSX.writeFile(wb2, nombreArchivo('ERI', 'xlsx'));
+  }
+}
+function exportarFamilias() {
+  var aoa = [['Folio', 'F1: Nombre(s) y apellidos', 'Relación', 'F2: Nombre(s) y apellidos', 'Relación', 'F3: Nombre(s) y apellidos', 'Relación', 'Dirección', 'Teléfono de contacto', 'Observaciones']];
+  state.datos.familias.slice().sort(function (a, b) { return cmpFolio(a.folio, b.folio); }).forEach(function (f) { aoa.push([f.folio, f.f1_nombre, f.f1_relacion, f.f2_nombre, f.f2_relacion, f.f3_nombre, f.f3_relacion, f.direccion, f.telefono, f.observaciones]); });
+  var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, hojaDeAOA(aoa, [10, 28, 14, 28, 14, 28, 14, 36, 16, 30]), 'Datos Familia'); XLSX.writeFile(wb, nombreArchivo('Datos_familia', 'xlsx'));
+}
+function exportarVisitas() {
+  var v = state.datos.visitas.slice().sort(function (a, b) { return String(a.fecha).localeCompare(String(b.fecha)); });
+  var reg = [['Fecha', 'Folio', 'Tipo', 'Responsable', 'Asistentes', 'Observaciones']].concat(v.map(function (x) { return [x.fecha, x.folio, x.tipo, x.responsable, x.asistentes, x.observaciones]; }));
+  var meses = {}; v.forEach(function (x) { if (x.fecha) meses[String(x.fecha).slice(0, 7)] = 1; }); var ms = Object.keys(meses).sort();
+  var fol = {}; v.forEach(function (x) { fol[x.folio] = 1; });
+  var res = [['Folio'].concat(ms).concat(['Total'])].concat(Object.keys(fol).sort(cmpFolio).map(function (f) { var t = 0; var row = [f].concat(ms.map(function (m) { var n = v.filter(function (x) { return x.folio === f && String(x.fecha).slice(0, 7) === m; }).length; t += n; return n; })); return row.concat([t]); }));
+  var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, hojaDeAOA(reg, [12, 10, 22, 22, 24, 50]), 'Registro de visitas'); XLSX.utils.book_append_sheet(wb, hojaDeAOA(res), 'Visitas Fam'); XLSX.writeFile(wb, nombreArchivo('Visitas_familiares', 'xlsx'));
+}
+
+/* ======================= IMPRESIÓN (PDF e instrumentos en blanco) ======================= */
+var CSS_PRINT = '@page{size:letter;margin:14mm}*{box-sizing:border-box}body{font-family:Nunito,Arial,sans-serif;color:#141718;font-size:11.5pt;margin:0}h1,h2,h3{font-family:Fredoka,Nunito,sans-serif;margin:0}' +
+  '.enc{display:flex;justify-content:space-between;align-items:center;border-bottom:4px solid #71CB47;padding-bottom:8px;margin-bottom:12px}.enc img{height:58px}.enc .der{text-align:right;font-size:10pt;color:#4A5053}' +
+  '.stripe{height:5px;display:flex;margin-bottom:12px}.stripe span{flex:1}.stripe span:nth-child(1){background:#71CB47}.stripe span:nth-child(2){background:#4FAFEA}.stripe span:nth-child(3){background:#DB5183}' +
+  'table{width:100%;border-collapse:collapse;margin:6px 0 12px}th,td{border:1px solid #CFD9CA;padding:5px 6px;font-size:10pt;vertical-align:top;text-align:left}th{background:#F1F6EE;font-size:9pt}td.c,th.c{text-align:center}.num{text-align:right}' +
+  '.campos{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;margin:8px 0 12px}.campos div{border-bottom:1px solid #141718;padding:14px 0 2px;font-size:10pt}' +
+  '.inst{background:#E5F3FC;border-radius:8px;padding:8px 10px;font-size:10pt;margin-bottom:10px}.preg{break-inside:avoid;margin:0 0 9px}.preg b{display:block;margin-bottom:3px}.ops{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:10.5pt}.box{display:inline-block;width:12px;height:12px;border:1.3px solid #141718;border-radius:2px;margin-right:5px;vertical-align:-1px}' +
+  '.sec{background:#FBE7EF;border-radius:6px;padding:5px 8px;font-weight:700;font-size:10pt;margin:10px 0 6px}.linea{display:inline-block;border-bottom:1px solid #141718;min-width:160px;margin-left:6px}' +
+  '.chip{display:inline-block;padding:1px 7px;border-radius:10px;font-size:9pt;font-weight:700}.bajo,.normal{background:#EAF7E2;color:#3F8F1F}.medio,.limite{background:#FDF1D8;color:#8A5A00}.alto,.anormal{background:#FBE7EF;color:#A8315D}' +
+  '.barra{display:flex;height:12px;border-radius:4px;overflow:hidden;background:#eee;width:150px}.barra span{display:block}.b0{background:#71CB47}.b1{background:#F4C95D}.b2{background:#DB5183}' +
+  '.pie{margin-top:14px;font-size:8.5pt;color:#7A8285;border-top:1px solid #E1E8DD;padding-top:6px}.kpis{display:flex;gap:10px;margin:8px 0 12px}.kpi{flex:1;border:1px solid #E1E8DD;border-radius:8px;padding:6px 10px}.kpi b{font-size:16pt;font-family:Fredoka,sans-serif;display:block}' +
+  '@media print{.noprint{display:none}}';
+function ventanaImpresion(titulo, cuerpo) {
+  var w = window.open('', '_blank');
+  if (!w) { alert('Tu navegador bloqueó la ventana de impresión. Permite ventanas emergentes para esta página.'); return; }
+  var logo = new URL('logo.png', location.href).href;
+  w.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>' + esc(titulo) + '</title><link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600&family=Nunito:wght@400;700&display=swap" rel="stylesheet"><style>' + CSS_PRINT + '</style></head><body>' +
+    '<div class="noprint" style="background:#141718;color:#fff;padding:10px 14px;font-family:Nunito,sans-serif;display:flex;justify-content:space-between;align-items:center"><span>Vista de impresión · elige "Guardar como PDF" en el destino para obtener el PDF.</span><button onclick="window.print()" style="background:#71CB47;border:0;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer">Imprimir / Guardar PDF</button></div>' +
+    '<div style="padding:0 2px">' + cuerpo.replace(/__LOGO__/g, logo) + '</div></body></html>');
+  w.document.close();
+  w.onload = function () { setTimeout(function () { w.focus(); w.print(); }, 400); };
+}
+function encabezadoPrint(titulo, sub) {
+  return '<div class="enc"><img src="__LOGO__" alt="Monstritos A.C."><div class="der"><h2 style="font-size:15pt;color:#141718">' + esc(titulo) + '</h2>' + (sub ? '<div>' + sub + '</div>' : '') + '</div></div>';
+}
+function imprimirBlancoSDQ() {
+  var filas = MONS.SDQ_ITEMS.map(function (it) { return '<tr><td>' + it.n + '. ' + esc(it.t) + '</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>'; }).join('');
+  ventanaImpresion('SDQ en blanco', encabezadoPrint('Cuestionario de capacidades y dificultades (SDQ-Cas)', 'Folio: <span class="linea" style="min-width:90px"></span>') +
+    '<div class="inst">Por favor pon una cruz en el cuadro que creas que corresponde a cada una de las preguntas: <b>No es verdad</b>, <b>Es verdad a medias</b>, <b>Verdaderamente sí</b>. Es importante que respondas a todas las preguntas lo mejor que puedas, aunque no estés completamente seguro/a de la respuesta, o te parezca una pregunta rara. Por favor, responde a las preguntas según como te han ido las cosas en los <b>últimos seis meses</b>.</div>' +
+    '<div class="campos"><div>Nombre:</div><div>Fecha:</div><div>Sexo:</div><div>Edad:</div></div>' +
+    '<table><thead><tr><th></th><th class="c" style="width:78px">No es verdad</th><th class="c" style="width:78px">Es verdad a medias</th><th class="c" style="width:78px">Verdaderamente sí</th></tr></thead><tbody>' + filas + '</tbody></table>' +
+    '<div class="pie">Monstritos A.C. · Anexo 7 · SDQ</div>');
+}
+function imprimirBlancoERI() {
+  var cuerpo = MONS.ERI_ITEMS.map(function (it) {
+    var sec = MONS.ERI_SECCIONES.filter(function (s) { return s.desde === it.n; })[0];
+    var ops = it.op.map(function (o) { return '<span><span class="box"></span>' + o[0] + ') ' + esc(o[1]) + (o[2] === '' ? ' ¿' + (it.n === 20 ? 'Cuál' : 'Qué fue') + '?<span class="linea"></span>' : '') + '</span>'; }).join('');
+    var extra = (it.n === 21 || it.n === 22) ? '<div style="font-size:9.5pt;margin-top:3px">Si contestaste a) o b): ¿Cuántas veces? <span class="linea" style="min-width:80px"></span> ¿Cuándo? <span class="linea"></span></div>' : '';
+    return (sec ? '<div class="sec">' + esc(sec.texto) + '</div>' : '') + '<div class="preg"><b>' + it.n + '. ' + esc(it.t) + '</b><div class="ops">' + ops + '</div>' + extra + '</div>';
+  }).join('');
+  ventanaImpresion('ERI en blanco', encabezadoPrint('Proyecto Trasciende con Valor · Cuestionario Inicial', 'Folio: <span class="linea" style="min-width:90px"></span>') +
+    '<div class="campos"><div>Nombre y apellido (opcional):</div><div>Edad:</div><div>Sexo:</div><div>Fecha:</div></div>' +
+    '<div class="inst">A continuación te presentamos una serie de afirmaciones; selecciona con una <b>X</b> la respuesta que más se acerque a tu opinión. Te recordamos que esto no es un examen y por tanto no hay una respuesta correcta o incorrecta. Contesta con honestidad de acuerdo a tu experiencia o forma de pensar.</div>' +
+    cuerpo + '<div class="pie">Monstritos A.C. · Anexo 8 · Cuestionario Inicial Primaria (ERI)</div>');
+}
+function imprimirBlancoFamilia() {
+  ventanaImpresion('Ficha de familia', encabezadoPrint('Ficha de datos de familia', 'Folio: <span class="linea" style="min-width:90px"></span>') +
+    '<table><thead><tr><th style="width:30px">#</th><th>Nombre(s) y apellidos</th><th style="width:170px">Relación</th></tr></thead><tbody>' + [1, 2, 3].map(function (i) { return '<tr><td>F' + i + '</td><td style="height:34px"></td><td></td></tr>'; }).join('') + '</tbody></table>' +
+    '<div class="campos" style="grid-template-columns:1fr"><div>Dirección:</div><div>Teléfono de contacto:</div><div>Observaciones:</div><div></div><div></div></div>' +
+    '<div class="pie">Monstritos A.C. · Datos de familia · información confidencial</div>');
+}
+
+function informePDF(momento, soloInst) {
+  var d = state.datos, p = d.proyecto;
+  var sdq = d.sdq.filter(function (x) { return x.momento === momento; }), eri = d.eri.filter(function (x) { return x.momento === momento; });
+  var aS = analizarSDQ(sdq), aE = analizarERI(eri);
+  var bar = function (c, t) { if (!t) return ''; return '<div class="barra">' + c.map(function (v, i) { return '<span class="b' + i + '" style="width:' + pct(v, t) + '%"></span>'; }).join('') + '</div>'; };
+  var html = encabezadoPrint('Informe de grupo · ' + momento, esc(p.escuela) + (p.grupo ? ' · ' + esc(p.grupo) : '') + (p.ciclo ? ' · Ciclo ' + esc(p.ciclo) : '') + '<br>' + esc(p.codigo) + ' · generado el ' + hoy());
+  html += '<div class="kpis"><div class="kpi"><b>' + d.participantes.length + '</b>niñas y niños en la lista</div><div class="kpi"><b>' + aS.n + '</b>SDQ (' + momento + ')</div><div class="kpi"><b>' + aE.n + '</b>ERI (' + momento + ')</div><div class="kpi"><b>' + aE.alertas + '</b>con alerta de autolesión</div></div>';
+  if (soloInst !== 'eri') {
+    html += '<h3>SDQ · Capacidades y dificultades</h3>' + (aS.n ? '<table><thead><tr><th>Escala</th><th>Distribución</th><th class="num">Normal</th><th class="num">Límite</th><th class="num">Anormal</th><th class="num">Promedio</th></tr></thead><tbody>' +
+      aS.escalas.map(function (s) { var c = [s.b['Normal'], s.b['Límite'], s.b['Anormal']]; return '<tr><td>' + esc(s.e.nombre) + '</td><td>' + bar(c, s.n) + '</td><td class="num">' + c[0] + ' (' + pct(c[0], s.n) + '%)</td><td class="num">' + c[1] + ' (' + pct(c[1], s.n) + '%)</td><td class="num">' + c[2] + ' (' + pct(c[2], s.n) + '%)</td><td class="num">' + fmt1(s.prom) + '</td></tr>'; }).join('') + '</tbody></table>' : '<p>Sin datos.</p>');
+  }
+  if (soloInst !== 'sdq') {
+    html += '<h3>ERI · Evaluación de riesgo</h3>' + (aE.n ? '<table><thead><tr><th></th><th class="num">Bajo</th><th class="num">Medio</th><th class="num">Alto</th></tr></thead><tbody>' +
+      '<tr><td>Puntuación total (promedio ' + fmt1(aE.prom) + ')</td><td class="num">' + aE.tot.BAJO + ' (' + pct(aE.tot.BAJO, aE.n) + '%)</td><td class="num">' + aE.tot.MEDIO + ' (' + pct(aE.tot.MEDIO, aE.n) + '%)</td><td class="num">' + aE.tot.ALTO + ' (' + pct(aE.tot.ALTO, aE.n) + '%)</td></tr>' +
+      '<tr><td><b>Riesgo global</b></td><td class="num">' + aE.glob.BAJO + ' (' + pct(aE.glob.BAJO, aE.n) + '%)</td><td class="num">' + aE.glob.MEDIO + ' (' + pct(aE.glob.MEDIO, aE.n) + '%)</td><td class="num">' + aE.glob.ALTO + ' (' + pct(aE.glob.ALTO, aE.n) + '%)</td></tr></tbody></table>' +
+      '<table><thead><tr><th>Pregunta · factor</th><th>Distribución</th><th class="num">0</th><th class="num">1</th><th class="num">2</th><th class="num">Prom.</th></tr></thead><tbody>' +
+      aE.cats.map(function (cat) { return '<tr><th colspan="6">' + esc(cat.cat.nombre) + '</th></tr>' + cat.items.map(function (i) { return '<tr><td>' + i.it.n + '. ' + esc(i.it.factor) + '</td><td>' + bar(i.c, i.resp) + '</td><td class="num">' + i.c[0] + '</td><td class="num">' + i.c[1] + '</td><td class="num">' + i.c[2] + '</td><td class="num">' + fmt1(i.prom) + '</td></tr>'; }).join(''); }).join('') +
+      '</tbody></table>' : '<p>Sin datos.</p>');
+    var comp = comparativo().filter(function (c) { return c.eriB !== null && c.eriF !== null; });
+    if (comp.length) {
+      html += '<h3>Comparativo base → final (ERI)</h3><table><thead><tr><th>Folio</th><th class="num">Base</th><th class="num">Final</th><th class="num">Cambio</th><th>Riesgo global</th></tr></thead><tbody>' +
+        comp.map(function (c) { return '<tr><td>' + esc(c.folio) + '</td><td class="num">' + c.eriB + '</td><td class="num">' + c.eriF + '</td><td class="num">' + (c.eriCambio === null ? '—' : (Math.round(c.eriCambio * 1000) / 10) + '%') + '</td><td><span class="chip ' + claseBanda(c.globB) + '">' + esc(c.globB) + '</span> → <span class="chip ' + claseBanda(c.globF) + '">' + esc(c.globF) + '</span></td></tr>'; }).join('') + '</tbody></table>';
+    }
+  }
+  html += '<div class="pie">Monstritos A.C. · Informe confidencial: identifica a las niñas y niños solo por folio. Los puntajes orientan el trabajo de los talleres y deben leerse junto con la observación del equipo; no son un diagnóstico.</div>';
+  ventanaImpresion('Informe ' + p.escuela + ' ' + momento, html);
+}
+
+/* ======================= ARRANQUE ======================= */
+render();
+</script>
+</body>
+</html>
