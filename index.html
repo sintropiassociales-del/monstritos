@@ -176,6 +176,25 @@
   .qr-box { display: inline-block; padding: 10px; background: #fff; border: 1px solid var(--borde); border-radius: 12px; }
   .enlace-url { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; word-break: break-all; background: #FAFCF9; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--borde); }
 
+  #progreso { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 200; pointer-events: none; opacity: 0; transition: opacity .2s; overflow: hidden; }
+  #progreso.on { opacity: 1; }
+  #progreso::before { content: ""; position: absolute; top: 0; bottom: 0; width: 40%; background: linear-gradient(90deg, var(--verde), var(--azul), var(--rosa)); animation: prog 1.1s ease-in-out infinite; }
+  @keyframes prog { from { left: -40%; } to { left: 100%; } }
+  .sk { background: linear-gradient(90deg, #EEF2EC 25%, #F7F9F6 50%, #EEF2EC 75%); background-size: 200% 100%; animation: sk 1.2s linear infinite; border-radius: 8px; }
+  @keyframes sk { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+  tr[data-href] { cursor: pointer; }
+  tr[data-href]:hover td { background: #FAFCF9; }
+  #main > * { animation: aparecer .16s ease-out; }
+  @keyframes aparecer { from { opacity: .35; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+  .rte-bar { display: flex; flex-wrap: wrap; gap: 4px; border: 1.5px solid var(--borde-2); border-bottom: none; border-radius: 10px 10px 0 0; padding: 6px; background: #FAFCF9; }
+  .rte-bar button { background: #fff; border: 1px solid var(--borde-2); border-radius: 7px; padding: 4px 9px; font-size: 13px; }
+  .rte { border: 1.5px solid var(--borde-2); border-radius: 0 0 10px 10px; min-height: 170px; padding: 12px 14px; font-size: 15px; line-height: 1.55; background: #fff; }
+  .rte:focus { outline: none; border-color: var(--azul); box-shadow: 0 0 0 3px var(--azul-claro); }
+  [contenteditable][data-placeholder]:empty:before { content: attr(data-placeholder); color: #9AA3A6; }
+  .rte ul, .rte ol { padding-left: 22px; }
+  .tagchip { background: var(--azul-claro); color: var(--azul-osc); border: none; border-radius: 20px; padding: 4px 10px; font-size: 12px; margin: 2px; }
+  .destino { display: inline-block; background: #F1F5EF; border-radius: 20px; padding: 3px 10px; font-size: 12.5px; margin: 2px; }
+  .destino.sin { background: var(--rosa-claro); color: var(--rosa-osc); }
   @media (max-width: 640px) {
     header.topbar { padding: 8px 14px; }
     .brand img { height: 36px; }
@@ -189,6 +208,7 @@
 </style>
 </head>
 <body>
+<div id="progreso"></div>
 <div id="app"></div>
 
 <script>
@@ -207,7 +227,7 @@ var ESTATUS_ALERTA = ['Pendiente', 'En seguimiento', 'Canalizada', 'Atendida'];
 var root = document.getElementById('app');
 var session = null;
 try { session = JSON.parse(localStorage.getItem('monstritos_session') || 'null'); } catch (e) { session = null; }
-var state = { view: 'proyectos', proyectos: [], proy: null, datos: null, sub: 'participantes', momentoAnalisis: 'Base', alertas: [], filtroAlertas: 'abiertas' };
+var state = { view: 'proyectos', proyectos: null, proy: null, datos: null, sub: 'participantes', momentoAnalisis: 'Base', alertas: [], alertasCargadas: false, filtroAlertas: 'abiertas', cacheDatos: {}, pSel: {} };
 
 /* ======================= UTILIDADES ======================= */
 function esc(s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -225,35 +245,132 @@ async function sha256(str) {
   return Array.from(new Uint8Array(buf)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
 }
 
+var enVuelo = 0;
+function progreso(delta) { enVuelo = Math.max(0, enVuelo + delta); var b = $('progreso'); if (b) b.classList.toggle('on', enVuelo > 0); }
 async function llamar(action, params) {
   if (WEB_APP_URL.indexOf('http') !== 0) return { ok: false, error: 'Falta configurar WEB_APP_URL en index.html (la URL /exec de Apps Script).' };
   var body = Object.assign({ action: action }, params || {});
+  progreso(1);
   try {
     var r = await fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) });
     return await r.json();
   } catch (e) {
     return { ok: false, error: 'No se pudo conectar con la plataforma. Revisa tu conexión a internet e intenta de nuevo.' };
-  }
+  } finally { progreso(-1); }
 }
+// Acciones que cambian datos de un grupo: el servidor devuelve el grupo ya
+// actualizado en la misma respuesta (un solo viaje en lugar de dos).
+var ACC_PROY = { guardarProyecto: 1, guardarParticipante: 1, importarParticipantes: 1, eliminarParticipante: 1, guardarSDQ: 1, eliminarSDQ: 1, guardarERI: 1, eliminarERI: 1, guardarFamilia: 1, eliminarFamilia: 1, guardarVisita: 1, eliminarVisita: 1, crearEnlace: 1, revocarEnlace: 1 };
+var ACC_PROSP = { guardarProspecto: 1, eliminarProspecto: 1, registrarSeguimientoProspecto: 1, eliminarSeguimientoProspecto: 1, importarProspectos: 1, enviarCorreoProspectos: 1 };
 async function api(action, params) {
   params = params || {}; params.token = session ? session.token : '';
+  if (ACC_PROY[action] && state.proy) params.devolverProyecto = state.proy;
+  if (ACC_PROSP[action]) params.devolverProspectos = 1;
   var r = await llamar(action, params);
-  if (!r.ok && r.error && /sesión inválida|expirada/i.test(r.error)) { cerrarSesion(); render(); }
+  if (!r.ok && r.error && /sesión inválida|expirada/i.test(r.error)) { cerrarSesion(); render(); return r; }
+  if (r.ok && r.datos) { aplicarDatos(r.datos); state._fresco = Date.now(); state.proyectos = null; }
+  if (r.ok && r.prosp) { state.prosp = r.prosp; state.prosp.t = Date.now(); state._prospFresco = Date.now(); }
+  if (r.ok && (action === 'guardarERI' || action === 'actualizarAlerta')) state.alertasCargadas = false;
   return r;
 }
+function aplicarDatos(r) {
+  r.sdq.forEach(function (x) { x.cal = MONS.calificarSDQ(x.respuestas); });
+  r.eri.forEach(function (x) { x.cal = MONS.calificarERI(x.respuestas); });
+  r.participantes.sort(function (a, b) { return cmpFolio(a.folio, b.folio); });
+  r.t = Date.now();
+  state.cacheDatos[r.proyecto.codigo] = r;
+  if (state.proy === r.proyecto.codigo) state.datos = r;
+}
+// Si la misma lectura ya va en camino, se comparte en lugar de repetirla.
+var EN_CURSO = {};
+function unaVez(clave, fn) {
+  if (!EN_CURSO[clave]) EN_CURSO[clave] = fn().finally(function () { delete EN_CURSO[clave]; });
+  return EN_CURSO[clave];
+}
+function pedirProyectos() { return unaVez('proyectos', function () { return api('listarProyectos').then(function (r) { if (r.ok) { state.proyectos = r.data; state.proyT = Date.now(); } return r; }); }); }
+function pedirProyecto(cod) { return unaVez('p:' + cod, function () { return api('cargarProyecto', { proyecto: cod }); }); }
+function firma(o) { try { return JSON.stringify(o); } catch (e) { return String(Math.random()); } }
+function esqueleto(filas) {
+  var h = '<div class="card"><div class="sk" style="height:30px;width:42%;margin-bottom:12px"></div><div class="sk" style="height:14px;width:68%;margin-bottom:22px"></div>';
+  for (var i = 0; i < (filas || 6); i++) h += '<div class="sk" style="height:38px;margin-bottom:8px;opacity:' + (1 - i * 0.12) + '"></div>';
+  return h + '</div>';
+}
+function precargar() {
+  if (!session) return;
+  if (!state.proyectos) pedirProyectos();
+  if (!state.alertasCargadas) cargarAlertas();
+  if (!state.prosp) unaVez('prosp', function () { return api('listarProspectos'); }).then(function (r) { if (r.ok && !state.prosp) { state.prosp = { data: r.data, bitacora: r.bitacora, t: Date.now() }; } });
+}
+async function cargarAlertas() {
+  var r = await unaVez('alertas', function () { return api('listarAlertas'); });
+  if (r.ok) { state.alertas = r.data; state.alertasCargadas = true; pintarContadorAlertas(); }
+  return r;
+}
+function pintarContadorAlertas() {
+  var n = document.querySelector('nav.tabs button[data-tab=alertas]'); if (!n) return;
+  var p = state.alertas.filter(function (a) { return a.estatus !== 'Atendida'; }).length;
+  n.innerHTML = 'Alertas' + (p ? '<span class="count">' + p + '</span>' : '');
+}
+function prefetchProyecto(cod) {
+  if (state.cacheDatos[cod]) return;
+  pedirProyecto(cod).then(function (r) { if (r.ok && !(state.cacheDatos[cod] && state.cacheDatos[cod].t > Date.now() - 1000)) aplicarDatos(r); });
+}
+
+/* ======================= NAVEGACIÓN (rutas en la dirección) ======================= */
+// #/grupos · #/grupo/COD/sub · #/alertas · #/prospeccion · #/instrumentos · #/usuarios · #/cuenta
+function ir(ruta) { if (location.hash === ruta) desdeRuta(); else location.hash = ruta; }
+function rutaActual() {
+  if (state.view === 'proyectos') return state.proy ? '#/grupo/' + encodeURIComponent(state.proy) + '/' + state.sub : '#/grupos';
+  return '#/' + state.view;
+}
+function desdeRuta() {
+  if (!session) { render(); return; }
+  var partes = location.hash.replace(/^#\/?/, '').split('/');
+  var v = partes[0] || 'grupos';
+  if (v === 'grupo' && partes[1]) {
+    state.view = 'proyectos';
+    var cod = decodeURIComponent(partes[1]);
+    state.sub = SUBTABS.some(function (t) { return t[0] === partes[2]; }) ? partes[2] : 'participantes';
+    state.proy = cod; asegurarShell(); abrirProyecto(cod); return;
+  } else {
+    state.proy = null;
+    state.view = { grupos: 'proyectos', alertas: 'alertas', prospeccion: 'prospeccion', instrumentos: 'instrumentos', usuarios: 'usuarios', cuenta: 'cuenta' }[v] || 'proyectos';
+  }
+  asegurarShell();
+  renderMain();
+}
+window.addEventListener('hashchange', desdeRuta);
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  var modales = document.querySelectorAll('.modal-bg'); if (!modales.length) return;
+  var m = modales[modales.length - 1];
+  if (m.dataset.sucio && !confirm('Tienes cambios sin guardar. ¿Cerrar de todos modos?')) return;
+  var x = m.querySelector('[data-x]'); if (x) x.click(); else m.remove();
+});
+document.addEventListener('click', function (e) {
+  var tr = e.target.closest('tr[data-href]');
+  if (!tr || e.target.closest('button, a, input, select, label, textarea')) return;
+  var b = tr.querySelector('[data-abrir], [data-p]'); if (b) b.click();
+});
 function guardarSesion(d) { session = { token: d.token, email: d.email, nombre: d.nombre, rol: d.rol }; try { localStorage.setItem('monstritos_session', JSON.stringify(session)); } catch (e) { } }
-function cerrarSesion() { session = null; try { localStorage.removeItem('monstritos_session'); } catch (e) { } state.view = 'proyectos'; state.proy = null; state.datos = null; state.prosp = null; }
+function cerrarSesion() { session = null; try { localStorage.removeItem('monstritos_session'); } catch (e) { } state.view = 'proyectos'; state.proy = null; state.datos = null; state.prosp = null; state.proyectos = null; state.alertas = []; state.alertasCargadas = false; state.cacheDatos = {}; state.pSel = {}; state.infoCorreo = null; if (location.hash) history.replaceState(null, '', location.pathname + location.search); }
 function esAdmin() { return session && session.rol === 'Administrador'; }
 
 function conSpinner(btn, texto) { var prev = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> ' + (texto || 'Guardando…'); return function () { btn.disabled = false; btn.innerHTML = prev; }; }
-function abrirModal(html) { var m = el('<div class="modal-bg">' + html + '</div>'); document.body.appendChild(m); m.addEventListener('mousedown', function (e) { if (e.target === m) m.dataset.down = '1'; }); return m; }
+function abrirModal(html) {
+  var m = el('<div class="modal-bg">' + html + '</div>'); document.body.appendChild(m);
+  m.addEventListener('input', function () { m.dataset.sucio = '1'; });
+  m.addEventListener('change', function () { m.dataset.sucio = '1'; });
+  var f = m.querySelector('input:not([disabled]):not([type=hidden]), textarea, [contenteditable]'); if (f && window.innerWidth > 700) setTimeout(function () { try { f.focus(); } catch (e) { } }, 30);
+  return m;
+}
 function toast(txt, tipo) {
   var t = el('<div class="msg ' + (tipo || 'ok') + '" style="position:fixed;right:16px;bottom:16px;z-index:99;max-width:340px;box-shadow:0 6px 24px rgba(0,0,0,.12)">' + esc(txt) + '</div>');
   document.body.appendChild(t); setTimeout(function () { t.remove(); }, 3200);
 }
 
 /* ======================= RENDER RAÍZ ======================= */
-function render() { if (!session) renderLogin(); else renderApp(); }
+function render() { if (!session) { renderLogin(); return; } renderApp(); }
 
 function renderLogin() {
   root.innerHTML =
@@ -272,13 +389,18 @@ function renderLogin() {
     var r = await llamar('login', { email: email, passHash: await sha256(pass) });
     fin();
     if (!r.ok) { $('lMsg').innerHTML = '<div class="msg error">' + esc(r.error) + '</div>'; return; }
-    guardarSesion(r); render();
+    guardarSesion(r); precargar(); desdeRuta();
   };
   $('btnLogin').onclick = go;
   ['lEmail', 'lPass'].forEach(function (id) { $(id).addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); }); });
 }
 
-function renderApp() {
+function asegurarShell() {
+  if (!$('main') || root.dataset.usuario !== session.email) { renderApp(true); return; }
+  root.querySelectorAll('nav.tabs button').forEach(function (b) { b.classList.toggle('active', b.dataset.tab === state.view); });
+}
+function renderApp(soloShell) {
+  root.dataset.usuario = session.email;
   var pend = state.alertas.filter(function (a) { return a.estatus !== 'Atendida'; }).length;
   var tabs = [['proyectos', 'Grupos y proyectos'], ['alertas', 'Alertas' + (pend ? '<span class="count">' + pend + '</span>' : '')], ['prospeccion', 'Prospección'], ['instrumentos', 'Instrumentos']];
   if (esAdmin()) tabs.push(['usuarios', 'Usuarios']);
@@ -292,17 +414,17 @@ function renderApp() {
     '<div class="stripe"><span></span><span></span><span></span></div>' +
     '<nav class="tabs">' + tabs.map(function (t) { return '<button data-tab="' + t[0] + '" class="' + (state.view === t[0] ? 'active' : '') + '">' + t[1] + '</button>'; }).join('') + '</nav>' +
     '<main id="main"></main>';
-  $('btnSalir').onclick = function () { cerrarSesion(); render(); };
-  $('brandHome').onclick = function (e) { e.preventDefault(); state.view = 'proyectos'; state.proy = null; renderApp(); };
+  $('btnSalir').onclick = function () { cerrarSesion(); delete root.dataset.usuario; render(); };
+  $('brandHome').onclick = function (e) { e.preventDefault(); ir('#/grupos'); };
   root.querySelectorAll('nav.tabs button').forEach(function (b) {
-    b.onclick = function () { state.view = b.dataset.tab; if (state.view === 'proyectos') { state.proy = null; } renderApp(); };
+    b.onclick = function () { ir(b.dataset.tab === 'proyectos' ? '#/grupos' : '#/' + b.dataset.tab); };
   });
-  renderMain();
+  if (!soloShell) renderMain();
 }
 
 function renderMain() {
   var v = state.view;
-  if (v === 'proyectos') { if (state.proy) renderProyecto(); else renderProyectos(); }
+  if (v === 'proyectos') { if (state.proy) abrirProyecto(state.proy); else renderProyectos(); }
   else if (v === 'alertas') renderAlertas();
   else if (v === 'prospeccion') renderProspeccion();
   else if (v === 'instrumentos') renderInstrumentos();
@@ -313,13 +435,19 @@ function renderMain() {
 /* ======================= PROYECTOS ======================= */
 async function renderProyectos() {
   var main = $('main');
-  main.innerHTML = '<div class="cargando"><span class="spinner"></span> Cargando grupos…</div>';
-  var r = await api('listarProyectos');
-  if (!r.ok) { main.innerHTML = '<div class="msg error">' + esc(r.error) + '</div>'; return; }
-  state.proyectos = r.data;
-  api('listarAlertas').then(function (ra) { if (ra.ok) { var antes = state.alertas.length; state.alertas = ra.data; if (antes !== ra.data.length && state.view === 'proyectos' && !state.proy) { var n = document.querySelector('nav.tabs button[data-tab=alertas]'); if (n) { var p = ra.data.filter(function (a) { return a.estatus !== 'Atendida'; }).length; n.innerHTML = 'Alertas' + (p ? '<span class="count">' + p + '</span>' : ''); } } } });
+  if (state.proyectos) dibujarProyectos(state.proyectos); else main.innerHTML = esqueleto(5);
+  if (state.proyectos && state.proyT && Date.now() - state.proyT < 15000) return;
+  var antes = firma(state.proyectos);
+  var r = await pedirProyectos();
+  if (state.view !== 'proyectos' || state.proy) return;
+  if (!r.ok) { if (!state.proyectos) main.innerHTML = '<div class="msg error">' + esc(r.error) + '</div>'; return; }
+  if (firma(r.data) !== antes) dibujarProyectos(r.data);
+  if (!state.alertasCargadas) cargarAlertas();
+}
+function dibujarProyectos(data) {
+  var main = $('main');
   var filtro = state.filtroProy || 'Activo';
-  var lista = r.data.filter(function (p) { return filtro === 'Todos' || (p.estatus || 'Activo') === filtro; });
+  var lista = data.filter(function (p) { return filtro === 'Todos' || (p.estatus || 'Activo') === filtro; });
   var filas = lista.map(function (p) {
     return '<tr><td><strong>' + esc(p.escuela) + '</strong><div class="muted">' + esc(p.codigo) + '</div></td>' +
       '<td>' + esc(p.grupo || '—') + '</td><td>' + esc(p.ciclo || '—') + '</td>' +
@@ -328,7 +456,7 @@ async function renderProyectos() {
       '<td>' + (p.nAlertas ? '<span class="chip alto">' + p.nAlertas + ' abierta' + (p.nAlertas > 1 ? 's' : '') + '</span>' : '<span class="muted">—</span>') + '</td>' +
       '<td>' + chipEstatus(p.estatus) + '</td>' +
       '<td class="acc"><button class="btn primary s" data-abrir="' + esc(p.codigo) + '">Abrir</button></td></tr>';
-  }).join('');
+  }).join('').replace(/<tr>/g, '<tr data-href>');
   main.innerHTML =
     '<div class="card">' +
       '<div class="toolbar between"><div><h1>Grupos y proyectos</h1><p class="subtle" style="margin:0">Cada grupo escolar donde Monstritos aplica el SDQ y el ERI es un proyecto. Ábrelo para capturar, analizar y dar seguimiento.</p></div>' +
@@ -338,8 +466,12 @@ async function renderProyectos() {
         : '<div class="msg info">No hay grupos ' + (filtro === 'Todos' ? '' : 'con estatus "' + filtro + '" ') + 'todavía. Crea el primero con "+ Nuevo grupo".</div>') +
     '</div>';
   $('btnNuevoProy').onclick = function () { modalProyecto(null); };
-  main.querySelectorAll('[data-filtro]').forEach(function (b) { b.onclick = function () { state.filtroProy = b.dataset.filtro; renderProyectos(); }; });
-  main.querySelectorAll('[data-abrir]').forEach(function (b) { b.onclick = function () { abrirProyecto(b.dataset.abrir); }; });
+  main.querySelectorAll('[data-filtro]').forEach(function (b) { b.onclick = function () { state.filtroProy = b.dataset.filtro; dibujarProyectos(state.proyectos); }; });
+  main.querySelectorAll('[data-abrir]').forEach(function (b) {
+    b.onclick = function () { state.sub = 'participantes'; ir('#/grupo/' + encodeURIComponent(b.dataset.abrir) + '/participantes'); };
+    var tr = b.closest('tr'); var pf = function () { prefetchProyecto(b.dataset.abrir); };
+    tr.addEventListener('mouseenter', pf); tr.addEventListener('touchstart', pf, { passive: true });
+  });
 }
 function chipEstatus(e) { e = e || 'Activo'; return '<span class="chip ' + ({ Activo: 'ok', Pausado: 'warn', Cerrado: 'gris' }[e] || 'gris') + '">' + esc(e) + '</span>'; }
 
@@ -366,23 +498,27 @@ function modalProyecto(p) {
     fin();
     if (!r.ok) { $('pMsg').innerHTML = '<div class="msg error">' + esc(r.error) + '</div>'; return; }
     m.remove();
-    if (ed) await recargarProyecto(); else abrirProyecto(r.codigo);
+    if (ed) { await recargarProyecto(); toast('Datos del grupo guardados.'); } else { state.proyectos = null; ir('#/grupo/' + encodeURIComponent(r.codigo) + '/participantes'); }
   };
 }
 
 async function abrirProyecto(codigo) {
   state.proy = codigo; state.sub = state.sub || 'participantes';
-  $('main').innerHTML = '<div class="cargando"><span class="spinner"></span> Abriendo grupo…</div>';
-  await recargarProyecto();
+  var enCache = state.cacheDatos[codigo];
+  if (enCache) { state.datos = enCache; renderProyecto(); if (Date.now() - (enCache.t || 0) < 20000) return; }
+  else { state.datos = null; $('main').innerHTML = esqueleto(7); }
+  await recargarProyecto(!!enCache);
 }
-async function recargarProyecto() {
-  var r = await api('cargarProyecto', { proyecto: state.proy });
-  if (!r.ok) { $('main').innerHTML = '<div class="msg error">' + esc(r.error) + '</div>'; return; }
-  r.sdq.forEach(function (x) { x.cal = MONS.calificarSDQ(x.respuestas); });
-  r.eri.forEach(function (x) { x.cal = MONS.calificarERI(x.respuestas); });
-  r.participantes.sort(function (a, b) { return cmpFolio(a.folio, b.folio); });
-  state.datos = r;
-  renderProyecto();
+// silencioso = ya hay algo en pantalla: solo se vuelve a pintar si cambió.
+async function recargarProyecto(silencioso) {
+  if (state._fresco && Date.now() - state._fresco < 2500 && state.datos && state.datos.proyecto.codigo === state.proy) { state._fresco = 0; renderProyecto(); return; }
+  var cod = state.proy, antes = firma(state.datos && { p: state.datos.proyecto, a: state.datos.participantes, s: state.datos.sdq.map(function (x) { return [x.folio, x.momento, x.actualizado]; }), e: state.datos.eri.map(function (x) { return [x.folio, x.momento, x.actualizado]; }), f: state.datos.familias, v: state.datos.visitas, l: state.datos.enlaces, al: state.datos.alertas });
+  var r = await pedirProyecto(cod);
+  if (state.proy !== cod || state.view !== 'proyectos') return;
+  if (!r.ok) { if (!silencioso) $('main').innerHTML = '<div class="msg error">' + esc(r.error) + '</div>'; else toast(r.error, 'error'); return; }
+  aplicarDatos(r);
+  var despues = firma({ p: r.proyecto, a: r.participantes, s: r.sdq.map(function (x) { return [x.folio, x.momento, x.actualizado]; }), e: r.eri.map(function (x) { return [x.folio, x.momento, x.actualizado]; }), f: r.familias, v: r.visitas, l: r.enlaces, al: r.alertas });
+  if (!silencioso || antes !== despues) { var y = window.scrollY; renderProyecto(); if (silencioso) window.scrollTo(0, y); }
 }
 
 var SUBTABS = [
@@ -410,9 +546,19 @@ function renderProyecto() {
     '</div>' +
     '<div class="subtabs">' + SUBTABS.map(function (t) { return '<button data-sub="' + t[0] + '" class="' + (state.sub === t[0] ? 'active' : '') + '"><span class="dot" style="background:' + t[2] + '"></span>' + t[1] + '</button>'; }).join('') + '</div>' +
     '<div class="card" id="subContent"></div>';
-  $('bcBack').onclick = function () { state.proy = null; renderApp(); };
+  $('bcBack').onclick = function () { ir('#/grupos'); };
   $('btnEditProy').onclick = function () { modalProyecto(p); };
-  document.querySelectorAll('[data-sub]').forEach(function (b) { b.onclick = function () { state.sub = b.dataset.sub; renderProyecto(); }; });
+  document.querySelectorAll('[data-sub]').forEach(function (b) {
+    b.onclick = function () {
+      state.sub = b.dataset.sub;
+      history.replaceState(null, '', '#/grupo/' + encodeURIComponent(state.proy) + '/' + state.sub);
+      document.querySelectorAll('[data-sub]').forEach(function (x) { x.classList.toggle('active', x === b); });
+      pintarSub();
+    };
+  });
+  pintarSub();
+}
+function pintarSub() {
   ({ participantes: subParticipantes, sdq: subSDQ, eri: subERI, familias: subFamilias, visitas: subVisitas, analisis: subAnalisis, enlaces: subEnlaces })[state.sub]();
 }
 
@@ -993,12 +1139,17 @@ function subEnlaces() {
 /* ======================= ALERTAS ======================= */
 async function renderAlertas() {
   var main = $('main');
-  main.innerHTML = '<div class="cargando"><span class="spinner"></span> Cargando alertas…</div>';
-  var r = await api('listarAlertas');
+  if (state.alertasCargadas) dibujarAlertas(); else main.innerHTML = esqueleto(4);
+  var antes = firma(state.alertasCargadas ? state.alertas : null);
+  var r = await cargarAlertas();
+  if (state.view !== 'alertas') return;
   if (!r.ok) { main.innerHTML = '<div class="msg error">' + esc(r.error) + '</div>'; return; }
-  state.alertas = r.data;
+  if (firma(state.alertas) !== antes && !main.querySelector('.aNota:focus')) dibujarAlertas();
+}
+function dibujarAlertas() {
+  var main = $('main');
   var f = state.filtroAlertas;
-  var lista = r.data.filter(function (a) { return f === 'todas' || a.estatus !== 'Atendida'; }).sort(function (a, b) { return String(b.fecha).localeCompare(String(a.fecha)); });
+  var lista = state.alertas.filter(function (a) { return f === 'todas' || a.estatus !== 'Atendida'; }).sort(function (a, b) { return String(b.fecha).localeCompare(String(a.fecha)); });
   main.innerHTML = '<div class="card"><h1>Alertas que requieren atención</h1>' +
     '<p class="subtle">Se abren solas cuando un ERI tiene respuesta afirmativa en la pregunta 21 (pensar en hacerse daño) o 22 (pensar en un plan para morir). Cada alerta debe atenderse de inmediato según el protocolo de canalización de Monstritos A.C., sin esperar al análisis del grupo. Registra aquí qué se hizo.</p>' +
     '<div class="toolbar"><button class="btn s ' + (f === 'abiertas' ? 'primary' : 'sec') + '" data-f="abiertas">Abiertas</button><button class="btn s ' + (f === 'todas' ? 'primary' : 'sec') + '" data-f="todas">Todas</button></div>' +
@@ -1011,12 +1162,17 @@ async function renderAlertas() {
           '<td class="acc"><button class="btn primary s aOk">Guardar</button></td></tr>';
       }).join('') + '</tbody></table></div>'
       : '<div class="msg ok">No hay alertas ' + (f === 'abiertas' ? 'abiertas' : '') + '.</div>') + '</div>';
-  main.querySelectorAll('[data-f]').forEach(function (b) { b.onclick = function () { state.filtroAlertas = b.dataset.f; renderAlertas(); }; });
+  main.querySelectorAll('[data-f]').forEach(function (b) { b.onclick = function () { state.filtroAlertas = b.dataset.f; dibujarAlertas(); }; });
   main.querySelectorAll('.aOk').forEach(function (b) {
     b.onclick = async function () {
       var tr = b.closest('tr'); var fin = conSpinner(b, '…');
-      var rr = await api('actualizarAlerta', { id: tr.dataset.id, estatus: tr.querySelector('.aEst').value, nota: tr.querySelector('.aNota').value });
-      fin(); if (!rr.ok) { alert(rr.error); return; } toast('Seguimiento guardado.'); renderApp();
+      var est = tr.querySelector('.aEst').value, nota = tr.querySelector('.aNota').value;
+      var rr = await api('actualizarAlerta', { id: tr.dataset.id, estatus: est, nota: nota });
+      fin(); if (!rr.ok) { alert(rr.error); return; }
+      var a = state.alertas.filter(function (x) { return x.id === tr.dataset.id; })[0];
+      if (a) { a.estatus = est; a.nota = nota; a.responsable = session.nombre; a.actualizado = 'ahora'; }
+      state.alertasCargadas = true; state.proyectos = null;
+      toast('Seguimiento guardado.'); pintarContadorAlertas(); dibujarAlertas();
     };
   });
 }
@@ -1038,17 +1194,27 @@ function chipPrioridad(p) { var c = { 'Muy alta': 'alto', 'Alta': 'medio', 'Medi
 function colorSeg(s) { return { 'Empresa / fundación nacional': 'var(--verde)', 'Empresa / fundación internacional': 'var(--azul)', 'Cooperación internacional / organismo': 'var(--rosa)' }[s] || 'var(--tinta-3)'; }
 
 async function cargarProspectos() {
+  if (state._prospFresco && Date.now() - state._prospFresco < 2500) { state._prospFresco = 0; return { ok: true }; }
   var r = await api('listarProspectos');
   if (!r.ok) return r;
-  state.prosp = { data: r.data, bitacora: r.bitacora };
+  state.prosp = { data: r.data, bitacora: r.bitacora, t: Date.now() };
   return r;
 }
 async function renderProspeccion() {
   var main = $('main');
   if (!state.prosp) {
-    main.innerHTML = '<div class="cargando"><span class="spinner"></span> Cargando base de prospección… (la primera vez tarda un poco más: se carga la base inicial)</div>';
+    main.innerHTML = esqueleto(8);
     var r = await cargarProspectos();
+    if (state.view !== 'prospeccion') return;
     if (!r.ok) { main.innerHTML = '<div class="msg error">' + esc(r.error) + '</div>'; return; }
+  } else if (Date.now() - (state.prosp.t || 0) > 30000 && !state._prospRefrescando) {
+    // se muestra lo que hay y se actualiza en segundo plano
+    state._prospRefrescando = true;
+    var antes = firma(state.prosp.data) + firma(state.prosp.bitacora);
+    cargarProspectos().then(function (rr) {
+      state._prospRefrescando = false;
+      if (rr.ok && state.view === 'prospeccion' && !document.querySelector('.modal-bg') && firma(state.prosp.data) + firma(state.prosp.bitacora) !== antes) renderProspeccion();
+    });
   }
   var f = state.pf = state.pf || { q: '', seg: '', prio: '', est: '', pend: false };
   var hoyS = hoy(), en7 = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
@@ -1074,7 +1240,8 @@ async function renderProspeccion() {
   var filas = lista.map(function (p) {
     var venc = p.fechaProximo && p.fechaProximo < hoyS;
     var nb = state.prosp.bitacora.filter(function (b) { return b.prospecto === p.id; }).length;
-    return '<tr><td class="muted" style="white-space:nowrap">' + esc(p.id) + '</td>' +
+    var tieneCorreo = /@/.test(p.correo || '');
+    return '<tr data-href><td style="width:34px"><input type="checkbox" class="pChk" data-id="' + esc(p.id) + '"' + (state.pSel[p.id] ? ' checked' : '') + (tieneCorreo ? '' : ' disabled title="Sin correo registrado"') + ' style="width:18px;height:18px;accent-color:var(--tinta)"></td><td class="muted" style="white-space:nowrap">' + esc(p.id) + '</td>' +
       '<td><span class="dot" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:' + colorSeg(p.segmento) + ';margin-right:6px" title="' + esc(p.segmento) + '"></span><strong>' + esc(p.institucion) + '</strong>' + (p.listaCorta === 'Sí' ? ' <span class="chip info" title="Lista corta">★</span>' : '') + '<div class="muted">' + esc([p.tipo, p.pais].filter(Boolean).join(' · ')) + '</div></td>' +
       '<td>' + chipPrioridad(p.prioridad) + '</td><td>' + chipEstatusP(p.estatus) + '</td>' +
       '<td>' + (p.contacto ? esc(p.contacto) : '<span class="muted">—</span>') + (p.correo ? '<div class="muted" style="word-break:break-all">' + esc(p.correo.split(',')[0]) + '</div>' : '') + '</td>' +
@@ -1085,6 +1252,7 @@ async function renderProspeccion() {
   main.innerHTML = '<div class="card">' +
     '<div class="toolbar between"><div><h1>Prospección</h1><p class="subtle" style="margin:0">Posibles donantes y aliados de Monstritos A.C. Abre un prospecto para editar sus datos y registrar cada seguimiento en su bitácora.</p></div>' +
     '<div class="toolbar" style="margin:0"><button class="btn sec" id="pXls">Descargar Excel</button>' + (esAdmin() ? '<button class="btn sec" id="pImp">Importar Excel</button>' : '') + '<button class="btn verde" id="pNuevo">+ Nuevo prospecto</button></div></div>' +
+    '<div class="toolbar" style="margin-top:10px;background:#FAFCF9;border:1px solid var(--borde);border-radius:12px;padding:8px 10px"><strong class="fredoka">✉ Correo</strong><span class="muted" id="pSelTxt"></span><span class="grow"></span><button class="btn sec s" id="pSelNada">Quitar selección</button><button class="btn sec s" id="pProg">Correos programados</button><button class="btn primary s" id="pMail">Enviar correo</button></div>' +
     '<input type="file" id="pFile" accept=".xlsx,.xls,.csv" class="hidden">' +
     '<div class="kpis">' +
       '<div class="kpi n"><div class="num">' + todos.length + '</div><div class="lbl">prospectos en la base</div></div>' +
@@ -1098,13 +1266,26 @@ async function renderProspeccion() {
       '<label style="margin:0;display:flex;gap:6px;align-items:center;font-weight:600"><input type="checkbox" id="pPend"' + (f.pend ? ' checked' : '') + '> Seguimiento en 7 días o vencido</label>' +
       '<span class="muted">' + lista.length + ' de ' + todos.length + '</span></div>' +
     '<div class="leyenda"><span><i style="background:var(--verde)"></i>Nacional</span><span><i style="background:var(--azul)"></i>Internacional</span><span><i style="background:var(--rosa)"></i>Cooperación / organismo</span><span>★ Lista corta</span></div>' +
-    (lista.length ? '<div class="tabla-wrap"><table><thead><tr><th>ID</th><th>Institución</th><th>Prioridad</th><th>Estatus</th><th>Contacto</th><th>Próximo paso</th><th class="num">Seg.</th><th></th></tr></thead><tbody>' + filas + '</tbody></table></div>' : '<div class="msg info">No hay prospectos con esos filtros.</div>') +
+    (lista.length ? '<div class="tabla-wrap"><table><thead><tr><th><input type="checkbox" id="pChkTodos" title="Seleccionar todos los filtrados que tienen correo" style="width:18px;height:18px;accent-color:var(--tinta)"></th><th>ID</th><th>Institución</th><th>Prioridad</th><th>Estatus</th><th>Contacto</th><th>Próximo paso</th><th class="num">Seg.</th><th></th></tr></thead><tbody>' + filas + '</tbody></table></div>' : '<div class="msg info">No hay prospectos con esos filtros.</div>') +
   '</div>';
   var refiltrar = function () { f.q = $('pQ').value; f.seg = $('pSeg').value; f.prio = $('pPrio').value; f.est = $('pEst').value; f.pend = $('pPend').checked; renderProspeccion().then(function () { var q = $('pQ'); if (document.activeElement !== q && f.q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); } }); };
   var tq; $('pQ').oninput = function () { clearTimeout(tq); tq = setTimeout(refiltrar, 250); };
   ['pSeg', 'pPrio', 'pEst', 'pPend'].forEach(function (id) { $(id).onchange = refiltrar; });
   $('pNuevo').onclick = function () { modalProspecto(null); };
   $('pXls').onclick = exportarProspectos;
+  var pintarSel = function () {
+    var ids = Object.keys(state.pSel);
+    $('pSelTxt').textContent = ids.length ? ids.length + ' seleccionado(s)' : 'Marca las casillas de las instituciones a las que quieras escribir.';
+    $('pMail').disabled = !ids.length; $('pSelNada').style.display = ids.length ? '' : 'none';
+    var chks = main.querySelectorAll('.pChk:not([disabled])'), marcados = main.querySelectorAll('.pChk:checked');
+    if ($('pChkTodos')) { $('pChkTodos').checked = chks.length && marcados.length === chks.length; $('pChkTodos').indeterminate = marcados.length > 0 && marcados.length < chks.length; }
+  };
+  main.querySelectorAll('.pChk').forEach(function (c) { c.onchange = function () { if (c.checked) state.pSel[c.dataset.id] = 1; else delete state.pSel[c.dataset.id]; pintarSel(); }; });
+  if ($('pChkTodos')) $('pChkTodos').onchange = function () { var on = this.checked; main.querySelectorAll('.pChk:not([disabled])').forEach(function (c) { c.checked = on; if (on) state.pSel[c.dataset.id] = 1; else delete state.pSel[c.dataset.id]; }); pintarSel(); };
+  $('pSelNada').onclick = function () { state.pSel = {}; main.querySelectorAll('.pChk').forEach(function (c) { c.checked = false; }); pintarSel(); };
+  $('pMail').onclick = function () { modalCorreo(Object.keys(state.pSel)); };
+  $('pProg').onclick = modalProgramados;
+  pintarSel();
   if ($('pImp')) { $('pImp').onclick = function () { $('pFile').click(); }; $('pFile').onchange = importarProspectosArchivo; }
   main.querySelectorAll('[data-p]').forEach(function (b) { b.onclick = function () { modalProspecto(state.prosp.data.filter(function (p) { return p.id === b.dataset.p; })[0]); }; });
 }
@@ -1191,6 +1372,156 @@ async function importarProspectosArchivo(e) {
   if (!r.ok) { alert(r.error); return; }
   toast('Importados: ' + r.nuevos + ' nuevos, ' + r.actualizados + ' actualizados.');
   await cargarProspectos(); renderProspeccion();
+}
+
+
+/* ======================= CORREO A PROSPECTOS ======================= */
+var RTE = [['bold', '<b>N</b>', 'Negrita'], ['italic', '<i>K</i>', 'Cursiva'], ['underline', '<u>S</u>', 'Subrayado'], ['insertUnorderedList', '• Lista', 'Viñetas'], ['insertOrderedList', '1. Lista', 'Numerada'], ['justifyLeft', '⟸', 'Izquierda'], ['justifyCenter', '⟺', 'Centrar'], ['createLink', '🔗 Enlace', 'Insertar enlace'], ['removeFormat', 'Limpiar', 'Quitar formato']];
+var ETIQUETAS = ['Institución', 'Contacto', 'Cargo', 'Correo', 'Mi nombre', 'Mi correo'];
+function primerCorreo(t) { var m = String(t || '').match(/[\w.+\-]+@[\w\-]+(\.[\w\-]+)+/); return m ? m[0] : ''; }
+function reemplazarEtiquetas(texto, pr, html) {
+  var contacto = pr.contacto ? String(pr.contacto).split('/')[0].trim() : 'equipo de ' + pr.institucion;
+  var val = { 'Institución': pr.institucion, 'Contacto': contacto, 'Cargo': pr.cargo, 'Correo': primerCorreo(pr.correo), 'Mi nombre': session.nombre, 'Mi correo': session.email };
+  var out = String(texto || '');
+  ETIQUETAS.forEach(function (t) { var v = html ? esc(val[t] || '') : (val[t] || ''); out = out.split('<<' + t + '>>').join(v).split('&lt;&lt;' + t + '&gt;&gt;').join(v); });
+  return out;
+}
+function tamano(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+function aBase64(file) { return new Promise(function (ok, mal) { var r = new FileReader(); r.onload = function () { ok(String(r.result).split(',')[1]); }; r.onerror = mal; r.readAsDataURL(file); }); }
+
+async function modalCorreo(ids) {
+  var regs = ids.map(function (id) { return state.prosp.data.filter(function (x) { return x.id === id; })[0]; }).filter(Boolean);
+  var con = regs.filter(function (r) { return primerCorreo(r.correo); });
+  var m = abrirModal('<div class="modal wide">' +
+    '<h2>Enviar correo · ' + con.length + ' destinatario(s)</h2>' +
+    '<div id="cRem" class="msg info" style="margin-top:0"><span class="spinner"></span> Revisando desde qué cuenta se envía…</div>' +
+    '<div style="margin:10px 0">' + regs.map(function (r) { var c = primerCorreo(r.correo); return '<span class="destino' + (c ? '' : ' sin') + '" title="' + esc(c || 'Sin correo') + '">' + esc(r.institucion) + (c ? '' : ' · sin correo') + '</span>'; }).join('') + '</div>' +
+    '<div class="toolbar"><label style="margin:0">Plantilla</label><select id="cPl" style="width:auto;flex:1;min-width:180px"><option value="">(correo nuevo)</option></select><button class="btn sec s" id="cPlG">Guardar como plantilla</button><button class="btn peligro s hidden" id="cPlB">Eliminar plantilla</button></div>' +
+    '<label>Asunto</label><input type="text" id="cAs" placeholder="ej. Alianza con Monstritos A.C. para <<Institución>>">' +
+    '<label>Mensaje</label><div class="rte-bar">' + RTE.map(function (b, i) { return '<button type="button" data-rte="' + i + '" title="' + b[2] + '">' + b[1] + '</button>'; }).join('') + '</div>' +
+    '<div id="cCu" class="rte" contenteditable="true" data-placeholder="Estimada/o <<Contacto>>: le escribe <<Mi nombre>>, de Monstritos A.C. …"></div>' +
+    '<div class="muted" style="margin:8px 0 4px">Clic para insertar una etiqueta donde está el cursor; se reemplaza por el dato de cada institución:</div>' +
+    '<div>' + ETIQUETAS.map(function (t) { return '<button type="button" class="tagchip" data-tag="<<' + t + '>>">' + t + '</button>'; }).join('') + '</div>' +
+    '<h3>Adjuntos</h3><input type="file" id="cAdj" multiple><div class="muted">Máximo 15 MB por archivo (Gmail permite 25 MB por correo en total).</div><div id="cAdjL" style="margin-top:6px"></div>' +
+    '<div class="toolbar" style="margin-top:14px"><label style="margin:0;display:flex;gap:6px;align-items:center;font-weight:600"><input type="checkbox" id="cCopia"> Enviarme una copia oculta</label>' +
+    '<label style="margin:0 0 0 12px;display:flex;gap:6px;align-items:center;font-weight:600"><input type="checkbox" id="cProgChk"> Programar para más tarde</label><input type="datetime-local" id="cProgF" class="hidden" style="width:auto"></div>' +
+    '<div id="cPrev" style="margin-top:14px"></div><div id="cMsg"></div>' +
+    '<div class="modal-actions"><button class="btn sec" data-x>Cerrar</button><button class="btn primary" id="cEnviar">Enviar correo</button></div></div>');
+  m.querySelector('[data-x]').onclick = function () { m.remove(); renderProspeccion(); };
+  var asunto = $('cAs'), cuerpo = $('cCu'), activo = cuerpo, rango = null, adjuntos = [];
+  asunto.onfocus = function () { activo = asunto; }; cuerpo.onfocus = function () { activo = cuerpo; };
+  var guardarRango = function () { var sel = window.getSelection(); if (sel.rangeCount && cuerpo.contains(sel.anchorNode)) rango = sel.getRangeAt(0).cloneRange(); };
+  var restaurar = function () { if (!rango) return; var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rango); };
+  cuerpo.addEventListener('keyup', guardarRango); cuerpo.addEventListener('mouseup', guardarRango);
+  var vista = function () {
+    var mu = con[0]; if (!mu) { $('cPrev').innerHTML = ''; return; }
+    $('cPrev').innerHTML = '<div class="muted">Vista previa para <strong>' + esc(mu.institucion) + '</strong> (' + esc(primerCorreo(mu.correo)) + ')</div>' +
+      '<div style="border:1px solid var(--borde);border-radius:12px;margin-top:6px;overflow:hidden"><div class="stripe"><span></span><span></span><span></span></div><div style="padding:14px 18px"><img src="logo.png" alt="" style="height:40px"><div style="font-weight:700;margin:10px 0 8px">' + (esc(reemplazarEtiquetas(asunto.value, mu, false)) || '<span class="muted">(sin asunto)</span>') + '</div>' +
+      '<div>' + (reemplazarEtiquetas(cuerpo.innerHTML, mu, true) || '<span class="muted">(sin mensaje)</span>') + '</div><div class="muted" style="border-top:1px solid var(--borde);margin-top:12px;padding-top:8px"><strong>' + esc(session.nombre) + '</strong> · Monstritos A.C.<br>' + esc(session.email) + '</div></div></div>';
+  };
+  asunto.oninput = vista; cuerpo.oninput = vista; vista();
+  m.querySelectorAll('[data-rte]').forEach(function (b) {
+    b.onclick = function () { var d = RTE[Number(b.dataset.rte)]; cuerpo.focus(); restaurar(); var v = null; if (d[0] === 'createLink') { v = prompt('Pega la dirección del enlace (con https://):', 'https://'); if (!v) return; } document.execCommand(d[0], false, v); guardarRango(); vista(); };
+  });
+  m.querySelectorAll('[data-tag]').forEach(function (c) {
+    c.onclick = function () {
+      var t = c.dataset.tag;
+      if (activo === asunto) { var a = asunto.selectionStart || asunto.value.length, z = asunto.selectionEnd || asunto.value.length; asunto.value = asunto.value.slice(0, a) + t + asunto.value.slice(z); asunto.focus(); }
+      else { cuerpo.focus(); restaurar(); document.execCommand('insertText', false, t); guardarRango(); }
+      vista();
+    };
+  });
+  // remitente + plantillas (en paralelo; se guardan para la próxima vez)
+  var pInfo = state.infoCorreo ? Promise.resolve(state.infoCorreo) : api('infoCorreo');
+  var pPl = api('listarPlantillasCorreo');
+  pInfo.then(function (r) {
+    if (!r.ok) { $('cRem').className = 'msg error'; $('cRem').textContent = r.error; return; }
+    state.infoCorreo = r;
+    var cuota = r.cuota !== null && r.cuota !== undefined ? ' Hoy puedes enviar hasta <strong>' + r.cuota + '</strong> correo(s) más.' : '';
+    if (r.modo === 'responder') {
+      $('cRem').className = 'msg warn';
+      $('cRem').innerHTML = 'Se enviará <strong>a tu nombre (' + esc(session.nombre) + ')</strong> desde la cuenta de la plataforma <strong>' + esc(r.cuentaPlataforma) + '</strong>, y las respuestas llegarán directo a <strong>tu correo (' + esc(r.tuCorreo) + ')</strong>.' + cuota +
+        ' <button type="button" class="btn link" id="cComo">¿Cómo hacer que salga desde mi correo?</button><div id="cComoTxt" class="hidden" style="margin-top:8px">Un administrador debe abrir el Gmail de <strong>' + esc(r.cuentaPlataforma) + '</strong> → ⚙ Configuración → <em>Cuentas e importación</em> → <em>Enviar como</em> → <em>Agregar otra dirección de correo</em>, escribir <strong>' + esc(r.tuCorreo) + '</strong> y confirmar el código que te llegará. A partir de ahí la plataforma lo detecta sola y tus correos saldrán desde tu dirección.</div>';
+      $('cComo').onclick = function () { $('cComoTxt').classList.toggle('hidden'); };
+      $('cCopia').checked = true;
+    } else {
+      $('cRem').className = 'msg ok';
+      $('cRem').innerHTML = 'Se enviará <strong>desde tu correo: ' + esc(r.tuCorreo) + '</strong>.' + cuota;
+      $('cCopia').closest('label').style.display = 'none';
+    }
+  });
+  var plantillas = [];
+  var pintarPl = function (sel) { $('cPl').innerHTML = '<option value="">(correo nuevo)</option>' + plantillas.map(function (x) { return '<option value="' + esc(x.id) + '"' + (x.id === sel ? ' selected' : '') + '>' + esc(x.nombre) + '</option>'; }).join(''); $('cPlB').classList.toggle('hidden', !sel); };
+  pPl.then(function (r) { if (r.ok) { plantillas = r.data; pintarPl(''); } });
+  $('cPl').onchange = function () { var x = plantillas.filter(function (t) { return t.id === $('cPl').value; })[0]; $('cPlB').classList.toggle('hidden', !x); if (!x) return; asunto.value = x.asunto; cuerpo.innerHTML = x.cuerpo; vista(); };
+  $('cPlG').onclick = async function () {
+    if (!asunto.value.trim() || !cuerpo.innerHTML.trim()) { alert('Escribe asunto y mensaje antes de guardarlo como plantilla.'); return; }
+    var n = prompt('Nombre de la plantilla (ej. "Presentación Trasciende con Valor"):'); if (!n) return;
+    var r = await api('guardarPlantillaCorreo', { nombre: n, asunto: asunto.value, cuerpo: cuerpo.innerHTML }); if (!r.ok) { alert(r.error); return; }
+    plantillas.push({ id: r.id, nombre: n, asunto: asunto.value, cuerpo: cuerpo.innerHTML }); pintarPl(r.id); toast('Plantilla guardada.');
+  };
+  $('cPlB').onclick = async function () {
+    if (!confirm('¿Eliminar esta plantilla?')) return;
+    var id = $('cPl').value, r = await api('eliminarPlantillaCorreo', { id: id }); if (!r.ok) { alert(r.error); return; }
+    plantillas = plantillas.filter(function (x) { return x.id !== id; }); pintarPl('');
+  };
+  // adjuntos
+  var pintarAdj = function () {
+    $('cAdjL').innerHTML = adjuntos.map(function (a, i) { return '<span class="destino">📎 ' + esc(a.nombre) + ' · ' + tamano(a.tamano) + ' <button type="button" class="btn link" data-qa="' + i + '" style="padding:0 2px">✕</button></span>'; }).join('');
+    $('cAdjL').querySelectorAll('[data-qa]').forEach(function (b) { b.onclick = function () { adjuntos.splice(Number(b.dataset.qa), 1); pintarAdj(); }; });
+  };
+  $('cAdj').onchange = async function () {
+    var files = Array.prototype.slice.call(this.files || []); this.disabled = true; $('cEnviar').disabled = true; var txtEnv = $('cEnviar').textContent; $('cEnviar').textContent = 'Esperando adjuntos…';
+    for (var i = 0; i < files.length; i++) {
+      var f = files[i];
+      if (f.size > 15 * 1048576) { toast('"' + f.name + '" pesa más de 15 MB.', 'error'); continue; }
+      $('cAdjL').insertAdjacentHTML('beforeend', '<span class="destino" id="cSub"><span class="spinner"></span> Subiendo ' + esc(f.name) + '…</span>');
+      var r = await api('subirAdjuntoCorreo', { nombre: f.name, mime: f.type, base64: await aBase64(f) });
+      if (!r.ok) toast(r.error, 'error'); else adjuntos.push({ id: r.id, nombre: r.nombre, tamano: r.tamano });
+      pintarAdj();
+    }
+    this.disabled = false; this.value = ''; $('cEnviar').disabled = false; $('cEnviar').textContent = txtEnv;
+  };
+  $('cProgChk').onchange = function () { $('cProgF').classList.toggle('hidden', !this.checked); $('cEnviar').textContent = this.checked ? 'Programar correo' : 'Enviar correo'; };
+  $('cEnviar').onclick = async function () {
+    var msg = $('cMsg'), prog = $('cProgChk').checked, cuando = $('cProgF').value;
+    if (!asunto.value.trim()) { msg.innerHTML = '<div class="msg error">Falta el asunto.</div>'; return; }
+    if (!cuerpo.textContent.trim()) { msg.innerHTML = '<div class="msg error">Falta el mensaje.</div>'; return; }
+    if (!con.length) { msg.innerHTML = '<div class="msg error">Ninguna de las instituciones seleccionadas tiene correo.</div>'; return; }
+    if (prog && (!cuando || new Date(cuando).getTime() <= Date.now())) { msg.innerHTML = '<div class="msg error">Elige una fecha y hora futuras.</div>'; return; }
+    if (!confirm(prog ? '¿Programar este correo para ' + con.length + ' institución(es)?' : '¿Enviar este correo a ' + con.length + ' institución(es) ahora? No se puede deshacer.')) return;
+    var fin = conSpinner(this, prog ? 'Programando…' : 'Enviando…');
+    var datos = { ids: con.map(function (r) { return r.id; }).join(','), asunto: asunto.value, cuerpo: cuerpo.innerHTML, adjuntos: adjuntos.map(function (a) { return a.id; }).join(','), copia: $('cCopia').checked, logoUrl: new URL('logo.png', location.href).href };
+    if (prog) datos.fechaEnvio = new Date(cuando).toISOString();
+    var r = await api(prog ? 'programarCorreoProspectos' : 'enviarCorreoProspectos', datos);
+    fin();
+    if (!r.ok) { msg.innerHTML = '<div class="msg error">' + esc(r.error) + '</div>'; return; }
+    m.dataset.sucio = '';
+    if (prog) { msg.innerHTML = '<div class="msg ok">' + esc(r.msg) + '</div>'; return; }
+    state.pSel = {}; if (state.infoCorreo && state.infoCorreo.cuota) state.infoCorreo.cuota -= r.enviados;
+    msg.innerHTML = '<div class="msg ' + (r.pendientes.length || r.errores.length ? 'warn' : 'ok') + '"><strong>' + r.enviados + ' correo(s) enviado(s)</strong> desde ' + esc(r.remitente) + '. Quedaron registrados en la bitácora de cada institución.' +
+      (r.sinCorreo.length ? '<br>Sin correo: ' + esc(r.sinCorreo.join(', ')) : '') +
+      (r.pendientes.length ? '<br>Se acabó la cuota diaria de Gmail; quedaron pendientes: ' + esc(r.pendientes.join(', ')) + '. Intenta mañana o prográmalo.' : '') +
+      (r.errores.length ? '<br>Errores: ' + esc(r.errores.join(' · ')) : '') + '</div>';
+    $('cEnviar').disabled = true;
+  };
+}
+
+async function modalProgramados() {
+  var m = abrirModal('<div class="modal wide"><h2>Correos programados</h2><div id="prL"><div class="sk" style="height:120px"></div></div><div class="modal-actions"><button class="btn sec" data-x>Cerrar</button></div></div>');
+  m.querySelector('[data-x]').onclick = function () { m.remove(); };
+  var pintar = async function () {
+    var r = await api('listarCorreosProgramados');
+    if (!r.ok) { $('prL').innerHTML = '<div class="msg error">' + esc(r.error) + '</div>'; return; }
+    $('prL').innerHTML = r.data.length ? '<div class="tabla-wrap"><table><thead><tr><th>Fecha y hora</th><th>Asunto</th><th>Para</th><th>Envía</th><th>Estatus</th><th></th></tr></thead><tbody>' + r.data.map(function (c) {
+      var f = new Date(c.fechaProgramada);
+      return '<tr><td style="white-space:nowrap">' + esc(isNaN(f) ? c.fechaProgramada : f.toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })) + '</td><td>' + esc(c.asunto) + (c.adjuntos ? ' <span class="muted">📎' + c.adjuntos + '</span>' : '') + '</td><td style="max-width:260px;font-size:13px">' + esc(c.destinatarios) + '</td><td>' + esc(c.remitenteNombre) + '</td>' +
+        '<td>' + '<span class="chip ' + ({ Pendiente: 'info', Enviado: 'ok', Parcial: 'warn', Error: 'err', Cancelado: 'gris' }[c.estatus] || 'gris') + '">' + esc(c.estatus) + '</span>' + (c.resultado ? '<div class="muted" style="font-size:12px">' + esc(c.resultado) + '</div>' : '') + '</td>' +
+        '<td class="acc">' + (c.estatus === 'Pendiente' ? '<button class="btn peligro s" data-cancel="' + esc(c.id) + '">Cancelar</button>' : '') + '</td></tr>';
+    }).join('') + '</tbody></table></div>' : '<div class="msg info">No hay correos programados.</div>';
+    $('prL').querySelectorAll('[data-cancel]').forEach(function (b) { b.onclick = async function () { if (!confirm('¿Cancelar este envío programado?')) return; var rc = await api('cancelarCorreoProgramado', { id: b.dataset.cancel }); if (!rc.ok) { alert(rc.error); return; } pintar(); }; });
+  };
+  pintar();
 }
 
 /* ======================= INSTRUMENTOS (en blanco) ======================= */
@@ -1448,7 +1779,7 @@ function informePDF(momento, soloInst) {
 }
 
 /* ======================= ARRANQUE ======================= */
-render();
+if (session) { precargar(); desdeRuta(); } else renderLogin();
 </script>
 </body>
 </html>
