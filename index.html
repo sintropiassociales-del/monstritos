@@ -242,7 +242,7 @@ async function api(action, params) {
   return r;
 }
 function guardarSesion(d) { session = { token: d.token, email: d.email, nombre: d.nombre, rol: d.rol }; try { localStorage.setItem('monstritos_session', JSON.stringify(session)); } catch (e) { } }
-function cerrarSesion() { session = null; try { localStorage.removeItem('monstritos_session'); } catch (e) { } state.view = 'proyectos'; state.proy = null; state.datos = null; }
+function cerrarSesion() { session = null; try { localStorage.removeItem('monstritos_session'); } catch (e) { } state.view = 'proyectos'; state.proy = null; state.datos = null; state.prosp = null; }
 function esAdmin() { return session && session.rol === 'Administrador'; }
 
 function conSpinner(btn, texto) { var prev = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> ' + (texto || 'Guardando…'); return function () { btn.disabled = false; btn.innerHTML = prev; }; }
@@ -280,7 +280,7 @@ function renderLogin() {
 
 function renderApp() {
   var pend = state.alertas.filter(function (a) { return a.estatus !== 'Atendida'; }).length;
-  var tabs = [['proyectos', 'Grupos y proyectos'], ['alertas', 'Alertas' + (pend ? '<span class="count">' + pend + '</span>' : '')], ['instrumentos', 'Instrumentos']];
+  var tabs = [['proyectos', 'Grupos y proyectos'], ['alertas', 'Alertas' + (pend ? '<span class="count">' + pend + '</span>' : '')], ['prospeccion', 'Prospección'], ['instrumentos', 'Instrumentos']];
   if (esAdmin()) tabs.push(['usuarios', 'Usuarios']);
   tabs.push(['cuenta', 'Mi cuenta']);
   root.innerHTML =
@@ -304,6 +304,7 @@ function renderMain() {
   var v = state.view;
   if (v === 'proyectos') { if (state.proy) renderProyecto(); else renderProyectos(); }
   else if (v === 'alertas') renderAlertas();
+  else if (v === 'prospeccion') renderProspeccion();
   else if (v === 'instrumentos') renderInstrumentos();
   else if (v === 'usuarios' && esAdmin()) renderUsuarios();
   else if (v === 'cuenta') renderCuenta();
@@ -1018,6 +1019,178 @@ async function renderAlertas() {
       fin(); if (!rr.ok) { alert(rr.error); return; } toast('Seguimiento guardado.'); renderApp();
     };
   });
+}
+
+/* ======================= PROSPECCIÓN ======================= */
+var P_ESTATUS = ['Sin contactar', 'Contacto identificado', 'Investigado', 'Contactado', 'En conversación', 'Propuesta enviada', 'Aliado / donante', 'Investigado · sin programa', 'Descartado'];
+var P_PRIORIDAD = ['Muy alta', 'Alta', 'Media-alta', 'Media', 'Media-baja', 'Baja'];
+var P_SEGMENTO = ['Empresa / fundación nacional', 'Empresa / fundación internacional', 'Cooperación internacional / organismo'];
+var P_VIA = ['Convocatoria abierta (todo el año)', 'Convocatoria / programa abierto', 'Convocatoria / alianza', 'Convocatoria periódica (monitorear)', 'Alianza estratégica', 'Solo por invitación (monitorear)', 'Contacto directo', 'Por investigar'];
+var P_TIPO_SEG = ['Correo enviado', 'Llamada', 'Reunión', 'Mensaje / LinkedIn', 'Propuesta enviada', 'Investigación', 'Otro'];
+var P_CAMPOS = [
+  ['Datos de la institución', [['institucion', 'Institución *'], ['segmento', 'Segmento', P_SEGMENTO], ['tipo', 'Tipo'], ['pais', 'País de origen'], ['afinidad', 'Afinidad / programa', 'area'], ['apoyo', 'Tipo de apoyo'], ['via', 'Vía de acceso', P_VIA], ['prioridad', 'Prioridad', P_PRIORIDAD], ['listaCorta', 'Lista corta', ['', 'Sí']], ['web', 'Sitio web'], ['referencia', 'Otra referencia']]],
+  ['Contacto', [['contacto', 'Persona de contacto'], ['cargo', 'Cargo / área'], ['correo', 'Correo'], ['telefono', 'Teléfono'], ['linkedin', 'LinkedIn']]],
+  ['Seguimiento', [['estatus', 'Estatus', P_ESTATUS], ['responsable', 'Responsable'], ['fechaPrimerContacto', 'Fecha primer contacto', 'date'], ['respuesta', 'Respuesta / hallazgo', 'area'], ['proximoPaso', 'Próximo paso'], ['fechaProximo', 'Fecha próximo seguimiento', 'date']]],
+  ['Notas', [['alineacion', 'Alineación con Monstritos', 'area'], ['notas', 'Notas / observaciones', 'area'], ['verificar', 'Por verificar', 'area'], ['fuente', 'Fuente'], ['fechaVerificacion', 'Fecha de verificación', 'date'], ['origen', 'Hoja de origen']]]
+];
+function chipEstatusP(e) { var c = { 'Contactado': 'info', 'En conversación': 'info', 'Propuesta enviada': 'warn', 'Aliado / donante': 'ok', 'Contacto identificado': 'normal', 'Investigado': 'info' }[e] || 'gris'; return '<span class="chip ' + c + '">' + esc(e || 'Sin contactar') + '</span>'; }
+function chipPrioridad(p) { var c = { 'Muy alta': 'alto', 'Alta': 'medio', 'Media-alta': 'limite' }[p] || 'gris'; return '<span class="chip ' + c + '">' + esc(p || '—') + '</span>'; }
+function colorSeg(s) { return { 'Empresa / fundación nacional': 'var(--verde)', 'Empresa / fundación internacional': 'var(--azul)', 'Cooperación internacional / organismo': 'var(--rosa)' }[s] || 'var(--tinta-3)'; }
+
+async function cargarProspectos() {
+  var r = await api('listarProspectos');
+  if (!r.ok) return r;
+  state.prosp = { data: r.data, bitacora: r.bitacora };
+  return r;
+}
+async function renderProspeccion() {
+  var main = $('main');
+  if (!state.prosp) {
+    main.innerHTML = '<div class="cargando"><span class="spinner"></span> Cargando base de prospección… (la primera vez tarda un poco más: se carga la base inicial)</div>';
+    var r = await cargarProspectos();
+    if (!r.ok) { main.innerHTML = '<div class="msg error">' + esc(r.error) + '</div>'; return; }
+  }
+  var f = state.pf = state.pf || { q: '', seg: '', prio: '', est: '', pend: false };
+  var hoyS = hoy(), en7 = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
+  var todos = state.prosp.data;
+  var lista = todos.filter(function (p) {
+    if (f.seg && p.segmento !== f.seg) return false;
+    if (f.prio && p.prioridad !== f.prio) return false;
+    if (f.est && p.estatus !== f.est) return false;
+    if (f.pend && !(p.fechaProximo && p.fechaProximo <= en7)) return false;
+    if (f.q) { var t = (p.institucion + ' ' + p.contacto + ' ' + p.correo + ' ' + p.afinidad + ' ' + p.notas + ' ' + p.pais + ' ' + p.id).toLowerCase(); if (t.indexOf(f.q.toLowerCase()) === -1) return false; }
+    return true;
+  });
+  var ordP = {}; P_PRIORIDAD.forEach(function (x, i) { ordP[x] = i; });
+  lista.sort(function (a, b) {
+    var va = a.fechaProximo && a.fechaProximo < hoyS ? 0 : 1, vb = b.fechaProximo && b.fechaProximo < hoyS ? 0 : 1;
+    return va - vb || (ordP[a.prioridad] || 9) - (ordP[b.prioridad] || 9) || String(a.institucion).localeCompare(String(b.institucion), 'es');
+  });
+  var cnt = function (fn) { return todos.filter(fn).length; };
+  var vencidos = cnt(function (p) { return p.fechaProximo && p.fechaProximo < hoyS; });
+  var proximos = cnt(function (p) { return p.fechaProximo && p.fechaProximo >= hoyS && p.fechaProximo <= en7; });
+  var activos = cnt(function (p) { return ['Contactado', 'En conversación', 'Propuesta enviada', 'Aliado / donante'].indexOf(p.estatus) > -1; });
+  var sel = function (id, ops, val, ph) { return '<select id="' + id + '" style="width:auto;min-width:150px"><option value="">' + ph + '</option>' + ops.map(function (o) { return '<option' + (o === val ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select>'; };
+  var filas = lista.map(function (p) {
+    var venc = p.fechaProximo && p.fechaProximo < hoyS;
+    var nb = state.prosp.bitacora.filter(function (b) { return b.prospecto === p.id; }).length;
+    return '<tr><td class="muted" style="white-space:nowrap">' + esc(p.id) + '</td>' +
+      '<td><span class="dot" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:' + colorSeg(p.segmento) + ';margin-right:6px" title="' + esc(p.segmento) + '"></span><strong>' + esc(p.institucion) + '</strong>' + (p.listaCorta === 'Sí' ? ' <span class="chip info" title="Lista corta">★</span>' : '') + '<div class="muted">' + esc([p.tipo, p.pais].filter(Boolean).join(' · ')) + '</div></td>' +
+      '<td>' + chipPrioridad(p.prioridad) + '</td><td>' + chipEstatusP(p.estatus) + '</td>' +
+      '<td>' + (p.contacto ? esc(p.contacto) : '<span class="muted">—</span>') + (p.correo ? '<div class="muted" style="word-break:break-all">' + esc(p.correo.split(',')[0]) + '</div>' : '') + '</td>' +
+      '<td style="max-width:240px">' + (p.proximoPaso ? esc(p.proximoPaso) : '<span class="muted">—</span>') + (p.fechaProximo ? '<div class="' + (venc ? 'delta-sube' : 'muted') + '">' + (venc ? 'Vencido · ' : '') + esc(p.fechaProximo) + '</div>' : '') + '</td>' +
+      '<td class="num">' + (nb || '') + '</td>' +
+      '<td class="acc"><button class="btn primary s" data-p="' + esc(p.id) + '">Abrir</button></td></tr>';
+  }).join('');
+  main.innerHTML = '<div class="card">' +
+    '<div class="toolbar between"><div><h1>Prospección</h1><p class="subtle" style="margin:0">Posibles donantes y aliados de Monstritos A.C. Abre un prospecto para editar sus datos y registrar cada seguimiento en su bitácora.</p></div>' +
+    '<div class="toolbar" style="margin:0"><button class="btn sec" id="pXls">Descargar Excel</button>' + (esAdmin() ? '<button class="btn sec" id="pImp">Importar Excel</button>' : '') + '<button class="btn verde" id="pNuevo">+ Nuevo prospecto</button></div></div>' +
+    '<input type="file" id="pFile" accept=".xlsx,.xls,.csv" class="hidden">' +
+    '<div class="kpis">' +
+      '<div class="kpi n"><div class="num">' + todos.length + '</div><div class="lbl">prospectos en la base</div></div>' +
+      '<div class="kpi r"><div class="num">' + cnt(function (p) { return p.prioridad === 'Muy alta'; }) + '</div><div class="lbl">con prioridad muy alta</div></div>' +
+      '<div class="kpi a"><div class="num">' + activos + '</div><div class="lbl">contactados o en conversación</div></div>' +
+      '<div class="kpi v"><div class="num">' + proximos + '</div><div class="lbl">seguimientos en los próximos 7 días</div></div>' +
+      (vencidos ? '<div class="kpi r" style="background:var(--rosa-claro)"><div class="num" style="color:var(--rosa-osc)">' + vencidos + '</div><div class="lbl">seguimientos vencidos</div></div>' : '') +
+    '</div>' +
+    '<div class="toolbar" style="margin-top:16px"><input type="search" id="pQ" placeholder="Buscar institución, contacto, correo, tema…" value="' + esc(f.q) + '" style="max-width:300px">' +
+      sel('pSeg', P_SEGMENTO, f.seg, 'Todos los segmentos') + sel('pPrio', P_PRIORIDAD, f.prio, 'Toda prioridad') + sel('pEst', P_ESTATUS, f.est, 'Todo estatus') +
+      '<label style="margin:0;display:flex;gap:6px;align-items:center;font-weight:600"><input type="checkbox" id="pPend"' + (f.pend ? ' checked' : '') + '> Seguimiento en 7 días o vencido</label>' +
+      '<span class="muted">' + lista.length + ' de ' + todos.length + '</span></div>' +
+    '<div class="leyenda"><span><i style="background:var(--verde)"></i>Nacional</span><span><i style="background:var(--azul)"></i>Internacional</span><span><i style="background:var(--rosa)"></i>Cooperación / organismo</span><span>★ Lista corta</span></div>' +
+    (lista.length ? '<div class="tabla-wrap"><table><thead><tr><th>ID</th><th>Institución</th><th>Prioridad</th><th>Estatus</th><th>Contacto</th><th>Próximo paso</th><th class="num">Seg.</th><th></th></tr></thead><tbody>' + filas + '</tbody></table></div>' : '<div class="msg info">No hay prospectos con esos filtros.</div>') +
+  '</div>';
+  var refiltrar = function () { f.q = $('pQ').value; f.seg = $('pSeg').value; f.prio = $('pPrio').value; f.est = $('pEst').value; f.pend = $('pPend').checked; renderProspeccion().then(function () { var q = $('pQ'); if (document.activeElement !== q && f.q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); } }); };
+  var tq; $('pQ').oninput = function () { clearTimeout(tq); tq = setTimeout(refiltrar, 250); };
+  ['pSeg', 'pPrio', 'pEst', 'pPend'].forEach(function (id) { $(id).onchange = refiltrar; });
+  $('pNuevo').onclick = function () { modalProspecto(null); };
+  $('pXls').onclick = exportarProspectos;
+  if ($('pImp')) { $('pImp').onclick = function () { $('pFile').click(); }; $('pFile').onchange = importarProspectosArchivo; }
+  main.querySelectorAll('[data-p]').forEach(function (b) { b.onclick = function () { modalProspecto(state.prosp.data.filter(function (p) { return p.id === b.dataset.p; })[0]); }; });
+}
+
+function campoProspecto(k, lbl, tipo, val) {
+  val = val || '';
+  var id = 'pf_' + k;
+  if (Array.isArray(tipo)) return '<div><label>' + lbl + '</label><select id="' + id + '">' + (tipo.indexOf('') > -1 ? '' : '<option value="">—</option>') + tipo.map(function (o) { return '<option value="' + esc(o) + '"' + (o === val ? ' selected' : '') + '>' + esc(o || '—') + '</option>'; }).join('') + (val && tipo.indexOf(val) === -1 ? '<option selected>' + esc(val) + '</option>' : '') + '</select></div>';
+  if (tipo === 'area') return '<div style="flex-basis:100%"><label>' + lbl + '</label><textarea id="' + id + '">' + esc(val) + '</textarea></div>';
+  return '<div><label>' + lbl + '</label><input type="' + (tipo === 'date' ? 'date' : 'text') + '" id="' + id + '" value="' + esc(val) + '"></div>';
+}
+function htmlBitacora(id) {
+  var b = state.prosp.bitacora.filter(function (x) { return x.prospecto === id; }).sort(function (a, c) { return String(c.fecha).localeCompare(String(a.fecha)); });
+  if (!b.length) return '<p class="muted">Todavía no hay seguimientos registrados.</p>';
+  return b.map(function (x) {
+    return '<div class="tile" style="margin-top:8px;padding:10px 12px"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><strong>' + esc(x.fecha) + ' · ' + esc(x.tipo || 'Seguimiento') + '</strong><span class="muted">' + esc(x.registradoPor) + (x.estatusNuevo ? ' · ' + esc(x.estatusNuevo) : '') + (esAdmin() ? ' <button class="btn link" data-delb="' + esc(x.id) + '">eliminar</button>' : '') + '</span></div>' +
+      (x.descripcion ? '<div>' + esc(x.descripcion) + '</div>' : '') + (x.resultado ? '<div><span class="muted">Resultado:</span> ' + esc(x.resultado) + '</div>' : '') +
+      (x.proximoPaso ? '<div><span class="muted">Próximo paso:</span> ' + esc(x.proximoPaso) + (x.fechaProximo ? ' (' + esc(x.fechaProximo) + ')' : '') + '</div>' : '') + '</div>';
+  }).join('');
+}
+function modalProspecto(p) {
+  var ed = !!p; p = p || { estatus: 'Sin contactar' };
+  var secciones = P_CAMPOS.map(function (s) { return '<h3>' + s[0] + '</h3><div class="row">' + s[1].map(function (c) { return campoProspecto(c[0], c[1], c[2], p[c[0]]); }).join('') + '</div>'; }).join('');
+  var m = abrirModal('<div class="modal wide">' +
+    '<div class="toolbar between" style="margin:0"><h2 style="margin:0">' + (ed ? esc(p.institucion) + ' <span class="muted" style="font-size:14px">' + esc(p.id) + '</span>' : 'Nuevo prospecto') + '</h2>' + (ed ? '<div>' + chipPrioridad(p.prioridad) + ' ' + chipEstatusP(p.estatus) + '</div>' : '') + '</div>' +
+    (ed ? '<div class="card pad-s" style="background:#FAFCF9;margin-top:14px"><h3 style="margin-top:0">Bitácora de seguimiento</h3><div id="pBit">' + htmlBitacora(p.id) + '</div>' +
+      '<h3>Registrar seguimiento</h3><div class="row"><div><label>Fecha</label><input type="date" id="sgFecha" value="' + hoy() + '"></div><div><label>Tipo</label><select id="sgTipo">' + P_TIPO_SEG.map(function (t) { return '<option>' + t + '</option>'; }).join('') + '</select></div><div><label>Nuevo estatus</label><select id="sgEst"><option value="">(sin cambio)</option>' + P_ESTATUS.map(function (t) { return '<option>' + t + '</option>'; }).join('') + '</select></div></div>' +
+      '<label>¿Qué se hizo?</label><input type="text" id="sgDesc" placeholder="ej. Se envió presentación de Trasciende con Valor a …">' +
+      '<label>Resultado / respuesta</label><input type="text" id="sgRes">' +
+      '<div class="row"><div style="flex:2"><label>Próximo paso</label><input type="text" id="sgProx"></div><div><label>Fecha próximo seguimiento</label><input type="date" id="sgFProx"></div></div>' +
+      '<button class="btn verde" id="sgOk" style="margin-top:12px">Registrar seguimiento</button><div id="sgMsg"></div></div>' : '') +
+    secciones +
+    '<div id="pfMsg"></div><div class="modal-actions">' + (ed && esAdmin() ? '<button class="btn peligro" id="pfDel" style="margin-right:auto">Eliminar</button>' : '') + '<button class="btn sec" data-x>Cerrar</button><button class="btn primary" id="pfOk">Guardar datos</button></div></div>');
+  m.querySelector('[data-x]').onclick = function () { m.remove(); renderProspeccion(); };
+  var conectarBit = function () {
+    m.querySelectorAll('[data-delb]').forEach(function (b) { b.onclick = async function () { if (!confirm('¿Eliminar este seguimiento de la bitácora?')) return; var r = await api('eliminarSeguimientoProspecto', { id: b.dataset.delb }); if (!r.ok) { alert(r.error); return; } await cargarProspectos(); $('pBit').innerHTML = htmlBitacora(p.id); conectarBit(); }; });
+  };
+  conectarBit();
+  $('pfOk').onclick = async function () {
+    var datos = { id: p.id || '' };
+    P_CAMPOS.forEach(function (s) { s[1].forEach(function (c) { datos[c[0]] = $('pf_' + c[0]).value; }); });
+    if (!datos.institucion.trim()) { $('pfMsg').innerHTML = '<div class="msg error">Escribe el nombre de la institución.</div>'; return; }
+    var fin = conSpinner(this);
+    var r = await api('guardarProspecto', datos);
+    fin(); if (!r.ok) { $('pfMsg').innerHTML = '<div class="msg error">' + esc(r.error) + '</div>'; return; }
+    await cargarProspectos(); m.remove(); toast('Prospecto guardado.'); renderProspeccion();
+  };
+  if ($('pfDel')) $('pfDel').onclick = async function () { if (!confirm('¿Eliminar "' + p.institucion + '" y toda su bitácora? No se puede deshacer.')) return; var r = await api('eliminarProspecto', { id: p.id }); if (!r.ok) { alert(r.error); return; } await cargarProspectos(); m.remove(); renderProspeccion(); };
+  if (ed) $('sgOk').onclick = async function () {
+    if (!$('sgDesc').value.trim() && !$('sgRes').value.trim()) { $('sgMsg').innerHTML = '<div class="msg error">Escribe qué se hizo o el resultado.</div>'; return; }
+    var fin = conSpinner(this);
+    var r = await api('registrarSeguimientoProspecto', { prospecto: p.id, fecha: $('sgFecha').value, tipo: $('sgTipo').value, descripcion: $('sgDesc').value, resultado: $('sgRes').value, proximoPaso: $('sgProx').value, fechaProximo: $('sgFProx').value, estatusNuevo: $('sgEst').value });
+    fin(); if (!r.ok) { $('sgMsg').innerHTML = '<div class="msg error">' + esc(r.error) + '</div>'; return; }
+    await cargarProspectos();
+    var nuevo = state.prosp.data.filter(function (x) { return x.id === p.id; })[0];
+    m.remove(); toast('Seguimiento registrado.'); modalProspecto(nuevo);
+  };
+}
+
+var P_ENCABEZADOS = [['id', 'ID'], ['institucion', 'Institución'], ['segmento', 'Segmento'], ['tipo', 'Tipo'], ['pais', 'País de origen'], ['afinidad', 'Afinidad / programa'], ['apoyo', 'Tipo de apoyo'], ['via', 'Vía de acceso'], ['prioridad', 'Prioridad'], ['listaCorta', 'Lista corta'], ['estatus', 'Estatus'], ['contacto', 'Persona de contacto'], ['cargo', 'Cargo / área'], ['correo', 'Correo'], ['telefono', 'Teléfono'], ['linkedin', 'LinkedIn'], ['web', 'Sitio web'], ['referencia', 'Otra referencia'], ['fechaPrimerContacto', 'Fecha primer contacto'], ['respuesta', 'Respuesta / hallazgo'], ['proximoPaso', 'Próximo paso'], ['fechaProximo', 'Fecha próximo seguimiento'], ['responsable', 'Responsable'], ['alineacion', 'Alineación Monstritos (embajadas)'], ['notas', 'Notas / observaciones'], ['verificar', 'Por verificar'], ['fechaVerificacion', 'Fecha de verificación'], ['fuente', 'Fuente'], ['origen', 'Hoja de origen']];
+function exportarProspectos() {
+  var d = state.prosp.data.slice().sort(function (a, b) { return String(a.id).localeCompare(String(b.id), 'es', { numeric: true }); });
+  var aoa = [P_ENCABEZADOS.map(function (h) { return h[1]; })].concat(d.map(function (p) { return P_ENCABEZADOS.map(function (h) { return p[h[0]] || ''; }); }));
+  var nombres = {}; state.prosp.data.forEach(function (p) { nombres[p.id] = p.institucion; });
+  var bit = [['ID prospecto', 'Institución', 'Fecha', 'Tipo', 'Qué se hizo', 'Resultado', 'Próximo paso', 'Fecha próximo', 'Estatus', 'Registró']].concat(state.prosp.bitacora.slice().sort(function (a, b) { return String(a.fecha).localeCompare(String(b.fecha)); }).map(function (b) { return [b.prospecto, nombres[b.prospecto] || '', b.fecha, b.tipo, b.descripcion, b.resultado, b.proximoPaso, b.fechaProximo, b.estatusNuevo, b.registradoPor]; }));
+  var wb = XLSX.utils.book_new();
+  var ws = hojaDeAOA(aoa, [7, 30, 22, 20, 12, 36, 24, 24, 11, 8, 20, 24, 16, 30, 18, 30, 30, 26, 12, 44, 30, 12, 14, 40, 50, 36, 12, 18, 24]);
+  ws['!autofilter'] = { ref: 'A1:' + XLSX.utils.encode_col(P_ENCABEZADOS.length - 1) + aoa.length };
+  XLSX.utils.book_append_sheet(wb, ws, 'Prospectos');
+  XLSX.utils.book_append_sheet(wb, hojaDeAOA(bit, [10, 30, 12, 18, 40, 40, 30, 12, 18, 18]), 'Bitácora');
+  XLSX.writeFile(wb, 'Prospeccion_Monstritos_' + hoy() + '.xlsx');
+}
+async function importarProspectosArchivo(e) {
+  var file = e.target.files[0]; if (!file) return;
+  var wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+  var hoja = wb.Sheets['Prospectos'] || wb.Sheets[wb.SheetNames[0]];
+  var rows = XLSX.utils.sheet_to_json(hoja, { defval: '', raw: false, dateNF: 'yyyy-mm-dd' });
+  var mapa = {}; P_ENCABEZADOS.forEach(function (h) { mapa[h[1].toLowerCase()] = h[0]; mapa[h[0].toLowerCase()] = h[0]; });
+  mapa['empresa / fundación'] = 'institucion'; mapa['alineación monstritos'] = 'alineacion';
+  var filas = rows.map(function (r) { var o = {}; Object.keys(r).forEach(function (k) { var c = mapa[k.toLowerCase().trim()]; if (c) o[c] = String(r[k]).trim(); }); return o; }).filter(function (o) { return o.institucion; });
+  if (!filas.length) { alert('No encontré una columna "Institución" con datos.'); return; }
+  if (!confirm('Se importarán ' + filas.length + ' prospectos. Los que ya existen (mismo ID o mismo nombre) se actualizan; los demás se agregan. ¿Continuar?')) return;
+  var r = await api('importarProspectos', { filas: JSON.stringify(filas) });
+  if (!r.ok) { alert(r.error); return; }
+  toast('Importados: ' + r.nuevos + ' nuevos, ' + r.actualizados + ' actualizados.');
+  await cargarProspectos(); renderProspeccion();
 }
 
 /* ======================= INSTRUMENTOS (en blanco) ======================= */
